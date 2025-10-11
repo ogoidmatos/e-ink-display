@@ -11,32 +11,24 @@ EpdiyHighlevelState hl;
 
 void app_main(void)
 {
-    // setup UI
-    ui_init(&hl);
+	// setup UI
+	ui_init(&hl);
 
+	// EpdRect base_img = {
+	//     .x = 0,
+	//     .y = 0,
+	//     .width = base_width,
+	//     .height = base_height
+	// };
 
-    // EpdRect base_img = {
-    //     .x = 0,
-    //     .y = 0,
-    //     .width = base_width,
-    //     .height = base_height
-    // };
+	// epd_fullclear(&hl, temperature);
 
+	// epd_copy_to_framebuffer(base_img, base_data, fb);
 
-    
+	// vTaskDelay(pdMS_TO_TICKS(1000));
+	// epd_hl_set_all_white(&hl);
+	// epd_clear();
+	// vTaskDelay(pdMS_TO_TICKS(1000));
 
-    // epd_fullclear(&hl, temperature);
-
-    // epd_copy_to_framebuffer(base_img, base_data, fb);
-
-
-
-    // vTaskDelay(pdMS_TO_TICKS(1000));
-    // epd_hl_set_all_white(&hl);
-    // epd_clear();
-    // vTaskDelay(pdMS_TO_TICKS(1000));
-
-    // epd_fill_rect(rect, BLACK, fb);
-
-
+	// epd_fill_rect(rect, BLACK, fb);
 }

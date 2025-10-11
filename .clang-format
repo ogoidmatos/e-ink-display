@@ -1,0 +1,10 @@
+﻿---
+BasedOnStyle: Mozilla
+AlwaysBreakAfterDefinitionReturnType: None
+AlwaysBreakAfterReturnType: None
+ColumnLimit: '100'
+IndentWidth: '4'
+TabWidth: '4'
+UseTab: Always
+
+...
