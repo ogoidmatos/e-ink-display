@@ -2,6 +2,7 @@
 
 #include "ui/ui.h"
 #include "utils/button.h"
+#include "utils/network_manager.h"
 
 EpdiyHighlevelState hl;
 

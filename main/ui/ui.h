@@ -7,8 +7,9 @@
 #define WHITE 0xFF
 #define MID_GRAY 0x8C
 
+#define TEMPERATURE 22
+
 static uint8_t* fb;
-static int temperature = 22;
 
 void ui_init(EpdiyHighlevelState* hl);
 

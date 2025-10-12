@@ -31,12 +31,12 @@ void ui_init(EpdiyHighlevelState* hl)
 	epd_poweron();
 
 	// clear screen
-	epd_fullclear(hl, temperature);
+	epd_fullclear(hl, TEMPERATURE);
 
 	// place on screen base elements
 	populate_base_ui();
 
-	enum EpdDrawError err = epd_hl_update_screen(hl, MODE_EPDIY_WHITE_TO_GL16, temperature);
+	enum EpdDrawError err = epd_hl_update_screen(hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE);
 
 	if (err != EPD_DRAW_SUCCESS) {
 		printf("Error updating screen: %d\n", err);
