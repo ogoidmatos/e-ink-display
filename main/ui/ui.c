@@ -1,5 +1,5 @@
-// Standard includes
-#include <stdio.h>
+// ESP includes
+#include "esp_log.h"
 
 // FreeRTOS includes
 #include "freertos/FreeRTOS.h"
@@ -25,7 +25,7 @@ static uint8_t* fb;
 static const EpdFont* const font_11 = &SegoeVF_11;
 static const EpdFont* const font_9 = &SegoeVF_9;
 
-void ui_init(EpdiyHighlevelState* hl)
+int ui_init(EpdiyHighlevelState* hl)
 {
 	// setup
 	epd_init(EPD_OPTIONS_DEFAULT);
@@ -39,18 +39,25 @@ void ui_init(EpdiyHighlevelState* hl)
 	epd_fullclear(hl, TEMPERATURE);
 
 	// place on screen base elements
-	populate_base_ui();
+	int err = populate_base_ui();
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_UI, "Error populating base UI.");
+		epd_poweroff();
+		return 1;
+	}
 
-	enum EpdDrawError err = epd_hl_update_screen(hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE);
-
-	if (err != EPD_DRAW_SUCCESS) {
-		printf("Error updating screen: %d\n", err);
+	enum EpdDrawError epd_err = epd_hl_update_screen(hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error updating screen. EPD error code: %d", epd_err);
+		epd_poweroff();
+		return 1;
 	}
 
 	epd_poweroff();
+	return 0;
 }
 
-void populate_base_ui()
+int populate_base_ui()
 {
 	// populate base UI
 	// define font properties
@@ -63,7 +70,12 @@ void populate_base_ui()
 	int cursor_y = 32;
 	char meetings[] = "Today's Meetings";
 
-	epd_write_string(font_11, meetings, &cursor_x, &cursor_y, fb, &header_font_props);
+	enum EpdDrawError epd_err =
+	  epd_write_string(font_11, meetings, &cursor_x, &cursor_y, fb, &header_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting meetings string. EPD error code: %d", epd_err);
+		return 1;
+	}
 
 	// write date
 	// TODO: make dynamic
@@ -71,14 +83,22 @@ void populate_base_ui()
 	cursor_y = 62;
 	char date[] = "Monday, 1 Jan 2024";
 
-	epd_write_string(font_9, date, &cursor_x, &cursor_y, fb, &subtitle_font_props);
+	epd_err = epd_write_string(font_9, date, &cursor_x, &cursor_y, fb, &subtitle_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting date string. EPD error code: %d", epd_err);
+		return 1;
+	}
 
 	// write weather
 	cursor_x = 50 + EPD_WIDTH / 2;
 	cursor_y = 32;
 	char weather[] = "Weather";
 
-	epd_write_string(font_11, weather, &cursor_x, &cursor_y, fb, &header_font_props);
+	epd_err = epd_write_string(font_11, weather, &cursor_x, &cursor_y, fb, &header_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting weather string. EPD error code: %d", epd_err);
+		return 1;
+	}
 
 	// write city
 	// TODO: make dynamic based on config
@@ -86,7 +106,11 @@ void populate_base_ui()
 	cursor_y = 62;
 	char city[] = "Lisbon, PT";
 
-	epd_write_string(font_9, city, &cursor_x, &cursor_y, fb, &subtitle_font_props);
+	epd_err = epd_write_string(font_9, city, &cursor_x, &cursor_y, fb, &subtitle_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting city string. EPD error code: %d", epd_err);
+		return 1;
+	}
 
 	// draw center line
 	epd_draw_vline(EPD_WIDTH / 2, 0, EPD_HEIGHT, MID_GRAY, fb);
@@ -118,7 +142,11 @@ void populate_base_ui()
 	cursor_y = today_base_widget.y + today_base_height + 35;
 	char upcoming[] = "Upcoming";
 
-	epd_write_string(font_9, upcoming, &cursor_x, &cursor_y, fb, &header_font_props);
+	epd_err = epd_write_string(font_9, upcoming, &cursor_x, &cursor_y, fb, &header_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting upcoming string. EPD error code: %d", epd_err);
+		return 1;
+	}
 
 	// draw forecast widgets
 	EpdRect forecast_base_widget = { .x = today_base_widget.x,
@@ -131,4 +159,6 @@ void populate_base_ui()
 	forecast_base_widget.y += forecast_base_height + 20;
 
 	epd_copy_to_framebuffer(forecast_base_widget, forecast_base_data, fb);
+
+	return 0;
 }

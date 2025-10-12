@@ -10,8 +10,10 @@
 
 #define TEMPERATURE 22
 
-void ui_init(EpdiyHighlevelState* hl);
+#define LOG_TAG_UI "UI"
 
-void populate_base_ui();
+int ui_init(EpdiyHighlevelState* hl);
+
+int populate_base_ui();
 
 #endif // UI_H
