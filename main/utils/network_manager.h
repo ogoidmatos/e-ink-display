@@ -1,6 +1,7 @@
 #ifndef NETWORK_MANAGER_H
 #define NETWORK_MANAGER_H
 
+// include necessary for static assert
 #include <string.h>
 
 // WiFi credentials

@@ -1,5 +1,7 @@
+// Standard includes
 #include <stdio.h>
 
+// FreeRTOS includes
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -15,10 +17,13 @@
 #include "widgets/forecast_base.h"
 #include "widgets/today_base.h"
 
+// Own includes
 #include "ui.h"
 
-static const EpdFont* font_11 = &SegoeVF_11;
-static const EpdFont* font_9 = &SegoeVF_9;
+// Static variables
+static uint8_t* fb;
+static const EpdFont* const font_11 = &SegoeVF_11;
+static const EpdFont* const font_9 = &SegoeVF_9;
 
 void ui_init(EpdiyHighlevelState* hl)
 {

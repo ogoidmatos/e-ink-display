@@ -1,5 +1,7 @@
+// Standard includes
 #include <stdio.h>
 
+// Own includes
 #include "ui/ui.h"
 #include "utils/button.h"
 #include "utils/network_manager.h"

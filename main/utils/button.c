@@ -1,6 +1,16 @@
+// ESP includes
+#include "driver/gpio.h"
+
+// FreeRTOS includes
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+
+// Own includes
 #include "button.h"
 
-TaskHandle_t button_task_handle = NULL;
+// Static variables
+static TaskHandle_t button_task_handle = NULL;
 static volatile int button_pressed = -1;
 
 // GPIO interrupt handler
