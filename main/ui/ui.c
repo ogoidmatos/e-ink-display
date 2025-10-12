@@ -4,16 +4,16 @@
 #include "freertos/task.h"
 
 // Font includes
-#include "../fonts/segoevf_11.h"
-#include "../fonts/segoevf_9.h"
+#include "fonts/segoevf_11.h"
+#include "fonts/segoevf_9.h"
 
 // Icon includes
-#include "../icons/calendar.h"
-#include "../icons/sun.h"
+#include "icons/calendar.h"
+#include "icons/sun.h"
 
 // Widget includes
-#include "../widgets/forecast_base.h"
-#include "../widgets/today_base.h"
+#include "widgets/forecast_base.h"
+#include "widgets/today_base.h"
 
 #include "ui.h"
 
@@ -43,7 +43,6 @@ void ui_init(EpdiyHighlevelState* hl)
 	}
 
 	epd_poweroff();
-	// vTaskDelay(1000);
 }
 
 void populate_base_ui()
