@@ -592,6 +592,21 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
+# WiFi Configuration
+#
+CONFIG_WIFI_SSID="your-ssid"
+CONFIG_WIFI_PASSWORD="your-password"
+# end of WiFi Configuration
+
+#
+# Weather API Configuration
+#
+CONFIG_WEATHER_API_KEY="your-api-key"
+CONFIG_LATITUDE="0.0"
+CONFIG_LONGITUDE="0.0"
+# end of Weather API Configuration
+
+#
 # Compiler options
 #
 CONFIG_COMPILER_OPTIMIZATION_DEBUG=y

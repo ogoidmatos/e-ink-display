@@ -1,0 +1,33 @@
+menu "WiFi Configuration"
+    config WIFI_SSID
+        string "WiFi SSID"
+        default "your-ssid"
+        help
+            The SSID of the WiFi network to connect to.
+
+    config WIFI_PASSWORD
+        string "WiFi Password"
+        default "your-password"
+        help
+            The password for the WiFi network.
+endmenu
+
+menu "Weather API Configuration"
+    config WEATHER_API_KEY
+        string "Weather API Key"
+        default "your-api-key"
+        help
+            The API key for accessing the Google Maps Weather API.
+    
+    config LATITUDE
+        string "Latitude"
+        default "0.0"
+        help
+            The latitude of the location for which to fetch weather data.
+
+    config LONGITUDE
+        string "Longitude"
+        default "0.0"
+        help
+            The longitude of the location for which to fetch weather data.
+endmenu
