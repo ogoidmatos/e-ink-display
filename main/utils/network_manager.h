@@ -13,4 +13,6 @@
 _Static_assert(strcmp(WIFI_SSID, "your-ssid") != 0, "Please configure WiFi credentials in menuconfig");
 _Static_assert(strcmp(WIFI_PASSWORD, "your-password") != 0, "Please configure WiFi credentials in menuconfig");
 
+int connect_wifi();
+
 #endif // NETWORK_MANAGER_H
