@@ -25,10 +25,17 @@ void app_main(void)
 	}
 	ESP_ERROR_CHECK(esp_err);
 
+	// Connect to WiFi
+	int err = connect_wifi();
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_MAIN, "Error connecting to WiFi.");
+		return;
+	}
+
 	button_switch_context_init();
 
 	// setup UI
-	int err = ui_init(&hl);
+	err = ui_init(&hl);
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_MAIN, "Error initializing UI.");
 		return;
