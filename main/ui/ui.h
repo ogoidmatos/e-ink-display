@@ -1,6 +1,9 @@
 #ifndef UI_H
 #define UI_H
 
+// System includes
+#include <stdint.h> 
+
 // EPD driver includes
 #include "epd_highlevel.h"
 
@@ -12,8 +15,8 @@
 
 #define LOG_TAG_UI "UI"
 
-int ui_init(EpdiyHighlevelState* hl);
+uint8_t ui_init(EpdiyHighlevelState* hl);
 
-int populate_base_ui();
+uint8_t populate_base_ui();
 
 #endif // UI_H

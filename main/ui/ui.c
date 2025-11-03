@@ -25,7 +25,7 @@ static uint8_t* fb;
 static const EpdFont* const font_11 = &SegoeVF_11;
 static const EpdFont* const font_9 = &SegoeVF_9;
 
-int ui_init(EpdiyHighlevelState* hl)
+uint8_t ui_init(EpdiyHighlevelState* hl)
 {
 	// setup
 	epd_init(EPD_OPTIONS_DEFAULT);
@@ -57,7 +57,7 @@ int ui_init(EpdiyHighlevelState* hl)
 	return 0;
 }
 
-int populate_base_ui()
+uint8_t populate_base_ui()
 {
 	// populate base UI
 	// define font properties
