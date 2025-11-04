@@ -1,4 +1,5 @@
 // Standard includes
+#include <stdint.h>
 #include <stdio.h>
 
 // ESP includes
@@ -10,6 +11,7 @@
 #include "ui/ui.h"
 #include "utils/button.h"
 #include "utils/network_manager.h"
+#include "utils/task_manager.h"
 
 #define LOG_TAG_MAIN "MAIN"
 
@@ -26,18 +28,24 @@ void app_main(void)
 	ESP_ERROR_CHECK(esp_err);
 
 	// Connect to WiFi
-	int err = connect_wifi();
+	uint8_t err = connect_wifi();
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_MAIN, "Error connecting to WiFi.");
 		return;
 	}
 
-	button_switch_context_init();
-
-	// setup UI
-	err = ui_init(&hl);
+	err = start_location_task();
 	if (err != 0) {
-		ESP_LOGE(LOG_TAG_MAIN, "Error initializing UI.");
+		ESP_LOGE(LOG_TAG_MAIN, "Error starting location task.");
 		return;
 	}
+
+	// button_switch_context_init();
+
+	// // setup UI
+	// err = ui_init(&hl);
+	// if (err != 0) {
+	// 	ESP_LOGE(LOG_TAG_MAIN, "Error initializing UI.");
+	// 	return;
+	// }
 }

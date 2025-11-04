@@ -89,7 +89,7 @@ esp_err_t http_event_handler(esp_http_client_event_t* evt)
 			output_len = 0;
 			break;
 		case HTTP_EVENT_DISCONNECTED:
-			ESP_LOGI(LOG_TAG_HTTP, "HTTP_EVENT_DISCONNECTED");
+			ESP_LOGD(LOG_TAG_HTTP, "HTTP_EVENT_DISCONNECTED");
 			output_len = 0;
 			break;
 		case HTTP_EVENT_REDIRECT:
