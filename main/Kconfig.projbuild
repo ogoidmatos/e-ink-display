@@ -19,6 +19,12 @@ menu "Weather API Configuration"
         help
             The API key for accessing the Google Maps Weather API.
     
+    config USE_DYNAMIC_LOCATION
+        bool "Use Dynamic Location"
+        default y
+        help
+            Enable this option to fetch weather data based on the device's current location using IP. If this option is disabled, the static latitude and longitude values below will be used.
+    
     config LATITUDE
         string "Latitude"
         default "0.0"

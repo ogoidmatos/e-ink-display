@@ -64,6 +64,20 @@ static void location_task(void* args)
 
 uint8_t start_location_task()
 {
+	// Check if we are using static location
+	// If dynamic location is disabled, set latitude and longitude to the configured values
+	// and do not start the location task
+#if !defined(CONFIG_USE_DYNAMIC_LOCATION) || (CONFIG_USE_DYNAMIC_LOCATION == 0)
+	latitude = atof(LATITUDE);
+	longitude = atof(LONGITUDE);
+	// fix is required, when using static location, the UI is not updated with the location
+	// TODO: when fetch weather, also get location to print in the UI
+	ESP_LOGD(LOG_TAG_TASK_MANAGER,
+			 "Using static location. Latitude: %f, Longitude: %f",
+			 latitude,
+			 longitude);
+	return 0;
+#else
 	uint8_t err =
 	  xTaskCreatePinnedToCore(location_task, "location_task", 4096, NULL, 5, NULL, CORE1);
 	if (err != pdPASS) {
@@ -72,4 +86,5 @@ uint8_t start_location_task()
 	}
 	ESP_LOGD(LOG_TAG_TASK_MANAGER, "Location task created.");
 	return 0;
+#endif
 }
