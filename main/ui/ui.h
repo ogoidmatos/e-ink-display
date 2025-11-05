@@ -15,8 +15,10 @@
 
 #define LOG_TAG_UI "UI"
 
-uint8_t ui_init(EpdiyHighlevelState* hl);
+uint8_t init_ui();
 
 uint8_t populate_base_ui();
+
+uint8_t write_location_ui(const char* city, const char* country_code);
 
 #endif // UI_H

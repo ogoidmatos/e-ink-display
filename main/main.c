@@ -15,8 +15,6 @@
 
 #define LOG_TAG_MAIN "MAIN"
 
-EpdiyHighlevelState hl;
-
 void app_main(void)
 {
 	// Initialize NVS
@@ -34,18 +32,19 @@ void app_main(void)
 		return;
 	}
 
+	// button_switch_context_init();
+
+	// setup UI
+	err = init_ui();
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_MAIN, "Error initializing UI.");
+		return;
+	}
+
+	// start location task
 	err = start_location_task();
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_MAIN, "Error starting location task.");
 		return;
 	}
-
-	// button_switch_context_init();
-
-	// // setup UI
-	// err = ui_init(&hl);
-	// if (err != 0) {
-	// 	ESP_LOGE(LOG_TAG_MAIN, "Error initializing UI.");
-	// 	return;
-	// }
 }

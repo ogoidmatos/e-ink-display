@@ -10,12 +10,12 @@
 
 // FreeRTOS includes
 #include "freertos/FreeRTOS.h"
-#include "freertos/idf_additions.h"
 #include "freertos/task.h"
 
 // Own includes
 #include "network_manager.h"
 #include "task_manager.h"
+#include "ui/ui.h"
 
 static volatile float latitude = 0.0;
 static volatile float longitude = 0.0;
@@ -51,6 +51,11 @@ static void location_task(void* args)
 	char* city = cJSON_GetObjectItem(json, "city")->valuestring;
 	char* country_code = cJSON_GetObjectItem(json, "countryCode")->valuestring;
 	ESP_LOGD(LOG_TAG_TASK_MANAGER, "City: %s, Country Code: %s", city, country_code);
+
+	err = write_location_ui(city, country_code);
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing location to UI.");
+	}
 
 	cJSON_Delete(json);
 

@@ -21,32 +21,42 @@
 #include "ui.h"
 
 // Static variables
+static EpdiyHighlevelState hl;
 static uint8_t* fb;
+
 static const EpdFont* const font_11 = &SegoeVF_11;
 static const EpdFont* const font_9 = &SegoeVF_9;
 
-uint8_t ui_init(EpdiyHighlevelState* hl)
+static EpdFontProperties header_font_props;
+static EpdFontProperties subtitle_font_props;
+
+uint8_t init_ui()
 {
 	// setup
 	epd_init(EPD_OPTIONS_DEFAULT);
-	*hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
+	hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
 
-	fb = epd_hl_get_framebuffer(hl);
+	fb = epd_hl_get_framebuffer(&hl);
+
+	// define font properties
+	header_font_props = epd_font_properties_default();
+	subtitle_font_props = epd_font_properties_default();
+	subtitle_font_props.fg_color = 5; // mid gray
 
 	epd_poweron();
 
 	// clear screen
-	epd_fullclear(hl, TEMPERATURE);
+	epd_fullclear(&hl, TEMPERATURE);
 
 	// place on screen base elements
-	int err = populate_base_ui();
+	uint8_t err = populate_base_ui();
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_UI, "Error populating base UI.");
 		epd_poweroff();
 		return 1;
 	}
 
-	enum EpdDrawError epd_err = epd_hl_update_screen(hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE);
+	enum EpdDrawError epd_err = epd_hl_update_screen(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error updating screen. EPD error code: %d", epd_err);
 		epd_poweroff();
@@ -59,12 +69,6 @@ uint8_t ui_init(EpdiyHighlevelState* hl)
 
 uint8_t populate_base_ui()
 {
-	// populate base UI
-	// define font properties
-	EpdFontProperties header_font_props = epd_font_properties_default();
-	EpdFontProperties subtitle_font_props = epd_font_properties_default();
-	subtitle_font_props.fg_color = 5; // mid gray
-
 	// write Today's meeting string
 	int cursor_x = 50;
 	int cursor_y = 32;
@@ -97,18 +101,6 @@ uint8_t populate_base_ui()
 	epd_err = epd_write_string(font_11, weather, &cursor_x, &cursor_y, fb, &header_font_props);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting weather string. EPD error code: %d", epd_err);
-		return 1;
-	}
-
-	// write city
-	// TODO: make dynamic based on config
-	cursor_x = 52 + EPD_WIDTH / 2;
-	cursor_y = 62;
-	char city[] = "Lisbon, PT";
-
-	epd_err = epd_write_string(font_9, city, &cursor_x, &cursor_y, fb, &subtitle_font_props);
-	if (epd_err != EPD_DRAW_SUCCESS) {
-		ESP_LOGE(LOG_TAG_UI, "Error writting city string. EPD error code: %d", epd_err);
 		return 1;
 	}
 
@@ -160,5 +152,40 @@ uint8_t populate_base_ui()
 
 	epd_copy_to_framebuffer(forecast_base_widget, forecast_base_data, fb);
 
+	return 0;
+}
+
+uint8_t write_location_ui(const char* city, const char* country_code)
+{
+	epd_poweron();
+
+	// write city
+	int cursor_x = 52 + EPD_WIDTH / 2;
+	int cursor_y = 62;
+	char location[64];
+	sprintf(location, "%s, %s", city, country_code);
+
+	ESP_LOGD(LOG_TAG_UI, "%s", location);
+
+	enum EpdDrawError epd_err =
+	  epd_write_string(font_9, location, &cursor_x, &cursor_y, fb, &subtitle_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting location string. EPD error code: %d", epd_err);
+		epd_poweroff();
+		return 1;
+	}
+	// Estimate of area to update
+	EpdRect location_area = {
+		.x = 52 + EPD_WIDTH / 2, .y = 42, .width = cursor_x - (52 + EPD_WIDTH / 2), .height = 30
+	};
+
+	epd_err = epd_hl_update_area(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE, location_area);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error updating screen. EPD error code: %d", epd_err);
+		epd_poweroff();
+		return 1;
+	}
+
+	epd_poweroff();
 	return 0;
 }
