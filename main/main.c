@@ -47,4 +47,11 @@ void app_main(void)
 		ESP_LOGE(LOG_TAG_MAIN, "Error starting location task.");
 		return;
 	}
+
+	// start weather task
+	err = start_weather_task();
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_MAIN, "Error starting weather task.");
+		return;
+	}
 }

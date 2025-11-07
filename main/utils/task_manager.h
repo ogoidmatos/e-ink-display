@@ -9,6 +9,12 @@
 #define CORE1 1
 #define CORE0 0
 
+typedef struct location {
+    float latitude;
+    float longitude;
+} location_t;
+
 uint8_t start_location_task();
+uint8_t start_weather_task();
 
 #endif // TASK_MANAGER_H
