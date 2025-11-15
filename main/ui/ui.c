@@ -14,7 +14,7 @@
 
 // Icon includes
 #include "icons/calendar.h"
-#include "icons/sun.h"
+#include "icons/weather_icons.h"
 
 // Widget includes
 #include "widgets/forecast_base.h"
@@ -135,7 +135,7 @@ uint8_t populate_weather_tab_ui()
 {
 	// draw weather icon
 	EpdRect weather_icon = {
-		.x = 15 + EPD_WIDTH / 2, .y = 14, .width = sun_width, .height = sun_height
+		.x = 15 + EPD_WIDTH / 2, .y = 14, .width = weather_icon_width, .height = weather_icon_height
 	};
 
 	epd_copy_to_framebuffer(weather_icon, sun_data, fb);
@@ -153,7 +153,7 @@ uint8_t populate_weather_tab_ui()
 	}
 
 	// draw today weather widget
-	EpdRect today_base_widget = { .x = 15 + sun_width / 2 + EPD_WIDTH / 2,
+	EpdRect today_base_widget = { .x = 15 + weather_icon_width / 2 + EPD_WIDTH / 2,
 								  .y = 85,
 								  .width = today_base_width,
 								  .height = today_base_height };
