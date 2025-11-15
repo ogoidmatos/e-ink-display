@@ -24,6 +24,8 @@
 static EpdiyHighlevelState hl;
 static uint8_t* fb;
 
+static SemaphoreHandle_t fb_mutex;
+
 static const EpdFont* const font_11 = &SegoeVF_11;
 static const EpdFont* const font_9 = &SegoeVF_9;
 
@@ -37,6 +39,12 @@ uint8_t init_ui()
 	hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
 
 	fb = epd_hl_get_framebuffer(&hl);
+
+	fb_mutex = xSemaphoreCreateMutex();
+	if (fb_mutex == NULL) {
+		ESP_LOGE(LOG_TAG_UI, "Error creating framebuffer mutex.");
+		return 1;
+	}
 
 	// define font properties
 	header_font_props = epd_font_properties_default();
@@ -93,20 +101,6 @@ uint8_t populate_base_ui()
 		return 1;
 	}
 
-	// write weather
-	cursor_x = 50 + EPD_WIDTH / 2;
-	cursor_y = 32;
-	char weather[] = "Weather";
-
-	epd_err = epd_write_string(font_11, weather, &cursor_x, &cursor_y, fb, &header_font_props);
-	if (epd_err != EPD_DRAW_SUCCESS) {
-		ESP_LOGE(LOG_TAG_UI, "Error writting weather string. EPD error code: %d", epd_err);
-		return 1;
-	}
-
-	// draw center line
-	epd_draw_vline(EPD_WIDTH / 2, 0, EPD_HEIGHT, MID_GRAY, fb);
-
 	// draw calendar icon
 	EpdRect calendar_icon = {
 		.x = 15, .y = 13, .width = calendar_width, .height = calendar_height
@@ -114,12 +108,39 @@ uint8_t populate_base_ui()
 
 	epd_copy_to_framebuffer(calendar_icon, calendar_data, fb);
 
+	// draw center line
+	epd_draw_vline(EPD_WIDTH / 2, 0, EPD_HEIGHT, MID_GRAY, fb);
+
+	// populate weather tab
+	uint8_t err = populate_weather_tab_ui();
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_UI, "Error populating weather tab UI.");
+		return 1;
+	}
+
+	return 0;
+}
+
+uint8_t populate_weather_tab_ui()
+{
 	// draw weather icon
 	EpdRect weather_icon = {
 		.x = 15 + EPD_WIDTH / 2, .y = 14, .width = sun_width, .height = sun_height
 	};
 
 	epd_copy_to_framebuffer(weather_icon, sun_data, fb);
+
+	// write weather
+	int cursor_x = 50 + EPD_WIDTH / 2;
+	int cursor_y = 32;
+	char weather[] = "Weather";
+
+	enum EpdDrawError epd_err =
+	  epd_write_string(font_11, weather, &cursor_x, &cursor_y, fb, &header_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting weather string. EPD error code: %d", epd_err);
+		return 1;
+	}
 
 	// draw today weather widget
 	EpdRect today_base_widget = { .x = 15 + sun_width / 2 + EPD_WIDTH / 2,
@@ -157,8 +178,6 @@ uint8_t populate_base_ui()
 
 uint8_t write_location_ui(const char* city, const char* country_code)
 {
-	epd_poweron();
-
 	// write city
 	int cursor_x = 52 + EPD_WIDTH / 2;
 	int cursor_y = 62;
@@ -167,8 +186,11 @@ uint8_t write_location_ui(const char* city, const char* country_code)
 
 	ESP_LOGD(LOG_TAG_UI, "%s", location);
 
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	enum EpdDrawError epd_err =
 	  epd_write_string(font_9, location, &cursor_x, &cursor_y, fb, &subtitle_font_props);
+	xSemaphoreGive(fb_mutex);
+
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting location string. EPD error code: %d", epd_err);
 		epd_poweroff();
@@ -178,6 +200,7 @@ uint8_t write_location_ui(const char* city, const char* country_code)
 	EpdRect location_area = {
 		.x = 52 + EPD_WIDTH / 2, .y = 42, .width = cursor_x - (52 + EPD_WIDTH / 2), .height = 30
 	};
+	epd_poweron();
 
 	epd_err = epd_hl_update_area(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE, location_area);
 	if (epd_err != EPD_DRAW_SUCCESS) {

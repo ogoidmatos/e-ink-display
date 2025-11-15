@@ -19,6 +19,8 @@ uint8_t init_ui();
 
 uint8_t populate_base_ui();
 
+uint8_t populate_weather_tab_ui();
+
 uint8_t write_location_ui(const char* city, const char* country_code);
 
 #endif // UI_H
