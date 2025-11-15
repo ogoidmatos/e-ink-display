@@ -41,6 +41,13 @@ void app_main(void)
 		return;
 	}
 
+	// start refresh task
+	err = start_refresh_task();
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_MAIN, "Error starting refresh task.");
+		return;
+	}
+
 	// start location task
 	err = start_location_task();
 	if (err != 0) {
@@ -49,7 +56,7 @@ void app_main(void)
 	}
 
 	// start weather task
-	err = start_weather_task();
+	err = start_weather_tasks();
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_MAIN, "Error starting weather task.");
 		return;

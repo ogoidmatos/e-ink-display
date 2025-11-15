@@ -15,6 +15,8 @@
 
 #define LOG_TAG_UI "UI"
 
+#define LOCATION_DONE_BIT (1 << 0)
+
 uint8_t init_ui();
 
 uint8_t populate_base_ui();
@@ -22,5 +24,7 @@ uint8_t populate_base_ui();
 uint8_t populate_weather_tab_ui();
 
 uint8_t write_location_ui(const char* city, const char* country_code);
+    
+uint8_t refresh_weather_tab_ui();
 
 #endif // UI_H

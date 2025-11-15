@@ -25,6 +25,7 @@ static EpdiyHighlevelState hl;
 static uint8_t* fb;
 
 static SemaphoreHandle_t fb_mutex;
+static EventGroupHandle_t ui_cycle_group;
 
 static const EpdFont* const font_11 = &SegoeVF_11;
 static const EpdFont* const font_9 = &SegoeVF_9;
@@ -43,6 +44,12 @@ uint8_t init_ui()
 	fb_mutex = xSemaphoreCreateMutex();
 	if (fb_mutex == NULL) {
 		ESP_LOGE(LOG_TAG_UI, "Error creating framebuffer mutex.");
+		return 1;
+	}
+
+	ui_cycle_group = xEventGroupCreate();
+	if (ui_cycle_group == NULL) {
+		ESP_LOGE(LOG_TAG_UI, "Error creating UI cycle event group.");
 		return 1;
 	}
 
@@ -193,16 +200,29 @@ uint8_t write_location_ui(const char* city, const char* country_code)
 
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting location string. EPD error code: %d", epd_err);
-		epd_poweroff();
 		return 1;
 	}
-	// Estimate of area to update
-	EpdRect location_area = {
-		.x = 52 + EPD_WIDTH / 2, .y = 42, .width = cursor_x - (52 + EPD_WIDTH / 2), .height = 30
-	};
+
+	// signal location done
+	xEventGroupSetBits(ui_cycle_group, LOCATION_DONE_BIT);
+
+	return 0;
+}
+
+uint8_t refresh_weather_tab_ui()
+{
+	xEventGroupWaitBits(ui_cycle_group,
+						LOCATION_DONE_BIT,
+						pdTRUE, // clear bits
+						pdTRUE, // wait for all bits
+						portMAX_DELAY);
 	epd_poweron();
 
-	epd_err = epd_hl_update_area(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE, location_area);
+	// Estimate of area to update
+	EpdRect location_area = { .x = 52 + EPD_WIDTH / 2, .y = 42, .width = 200, .height = 30 };
+
+	enum EpdDrawError epd_err =
+	  epd_hl_update_area(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE, location_area);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error updating screen. EPD error code: %d", epd_err);
 		epd_poweroff();

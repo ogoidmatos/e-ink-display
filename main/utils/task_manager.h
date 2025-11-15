@@ -15,6 +15,7 @@ typedef struct location {
 } location_t;
 
 uint8_t start_location_task();
-uint8_t start_weather_task();
+uint8_t start_weather_tasks();
+uint8_t start_refresh_task();
 
 #endif // TASK_MANAGER_H

@@ -34,7 +34,7 @@ _Static_assert(strcmp(LONGITUDE, "0.0") != 0, "Dynamic location is disabled. Ple
 #define LOG_TAG_NETWORK "NETWORK_MANAGER"
 #define LOG_TAG_HTTP    "HTTP_CLIENT"
 
-#define MAX_HTTP_OUTPUT_BUFFER 1024
+#define MAX_HTTP_OUTPUT_BUFFER 2048
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 

@@ -69,7 +69,7 @@ static void location_task(void* args)
 	vTaskDelete(NULL);
 }
 
-static void weather_task(void* args)
+static void current_weather_task(void* args)
 {
 	// wait on queue to receive location from ip api if location is dynamic
 	if (location_queue == NULL) {
@@ -114,6 +114,18 @@ static void weather_task(void* args)
 	char* weather_json_str = cJSON_Print(json);
 	ESP_LOGI(LOG_TAG_TASK_MANAGER, "Weather JSON: %s", weather_json_str);
 	free(weather_json_str);
+
+	cJSON_Delete(json);
+	vTaskDelete(NULL);
+}
+
+static void refresh_task(void* args)
+{
+	uint8_t err = refresh_weather_tab_ui();
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error refreshing weather tab UI.");
+	}
+	vTaskDelete(NULL);
 }
 
 uint8_t start_location_task()
@@ -148,13 +160,24 @@ uint8_t start_location_task()
 #endif
 }
 
-uint8_t start_weather_task()
+uint8_t start_weather_tasks()
 {
-	uint8_t err = xTaskCreate(weather_task, "weather_task", 4096, NULL, 5, NULL);
+	uint8_t err = xTaskCreate(current_weather_task, "current_weather_task", 4096, NULL, 5, NULL);
 	if (err != pdPASS) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating weather task.");
 		return 1;
 	}
 	ESP_LOGD(LOG_TAG_TASK_MANAGER, "Weather task created.");
+	return 0;
+}
+
+uint8_t start_refresh_task()
+{
+	uint8_t err = xTaskCreate(refresh_task, "refresh_task", 4096, NULL, 5, NULL);
+	if (err != pdPASS) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating refresh task.");
+		return 1;
+	}
+	ESP_LOGD(LOG_TAG_TASK_MANAGER, "Refresh task created.");
 	return 0;
 }
