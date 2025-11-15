@@ -1,6 +1,9 @@
 // ESP includes
 #include "esp_log.h"
 
+// EPD driver includes
+#include "epd_highlevel.h"
+
 // FreeRTOS includes
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -230,5 +233,10 @@ uint8_t refresh_weather_tab_ui()
 	}
 
 	epd_poweroff();
+	return 0;
+}
+
+uint8_t write_current_weather_ui()
+{
 	return 0;
 }

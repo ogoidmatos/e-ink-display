@@ -111,9 +111,47 @@ static void current_weather_task(void* args)
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error parsing JSON response.");
 		return;
 	}
-	char* weather_json_str = cJSON_Print(json);
-	ESP_LOGI(LOG_TAG_TASK_MANAGER, "Weather JSON: %s", weather_json_str);
-	free(weather_json_str);
+
+	// Parse JSON data for weather
+	const int is_day_time = cJSON_GetObjectItem(json, "isDayTime")->valueint;
+	const cJSON* weatherCondition = cJSON_GetObjectItem(json, "weatherCondition");
+	const char* description =
+	  cJSON_GetObjectItem(cJSON_GetObjectItem(weatherCondition, "description"), "text")
+		->valuestring;
+	const char* weather_code = cJSON_GetObjectItem(weatherCondition, "type")->valuestring;
+	const float temperature_c =
+	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(json, "temperature"), "degrees")->valuedouble;
+	const float feels_like_temperature_c =
+	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(json, "feelsLikeTemperature"), "degrees")
+		->valuedouble;
+	const int humidity = cJSON_GetObjectItem(json, "relativeHumidity")->valueint;
+	const int uv_index = cJSON_GetObjectItem(json, "uvIndex")->valueint;
+	const cJSON* current_conditions = cJSON_GetObjectItem(json, "currentConditionsHistory");
+	const float max_temperature_c =
+	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(current_conditions, "maxTemperature"),
+								 "degrees")
+		->valuedouble;
+	const float min_temperature_c =
+	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(current_conditions, "minTemperature"),
+								 "degrees")
+		->valuedouble;
+	const int wind_speed_kph =
+	  cJSON_GetObjectItem(cJSON_GetObjectItem(cJSON_GetObjectItem(json, "wind"), "speed"), "value")
+		->valueint;
+
+	ESP_LOGD(LOG_TAG_TASK_MANAGER,
+			 "Weather: %s, Code: %s, Temp: %.2fC, Feels like: %.2fC, Humidity: %d%%, UV Index: %d, "
+			 "Max Temp: %.2fC, Min Temp: %.2fC, Is Day Time: %d",
+			 description,
+			 weather_code,
+			 temperature_c,
+			 feels_like_temperature_c,
+			 humidity,
+			 uv_index,
+			 max_temperature_c,
+			 min_temperature_c,
+			 is_day_time,
+			 wind_speed_kph);
 
 	cJSON_Delete(json);
 	vTaskDelete(NULL);
@@ -127,6 +165,8 @@ static void refresh_task(void* args)
 	}
 	vTaskDelete(NULL);
 }
+
+// --------------------- Task start functions ---------------- //
 
 uint8_t start_location_task()
 {

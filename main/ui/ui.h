@@ -4,9 +4,6 @@
 // System includes
 #include <stdint.h> 
 
-// EPD driver includes
-#include "epd_highlevel.h"
-
 #define BLACK 0x00
 #define WHITE 0xFF
 #define MID_GRAY 0x8C
@@ -26,5 +23,7 @@ uint8_t populate_weather_tab_ui();
 uint8_t write_location_ui(const char* city, const char* country_code);
     
 uint8_t refresh_weather_tab_ui();
+
+uint8_t write_current_weather_ui();
 
 #endif // UI_H
