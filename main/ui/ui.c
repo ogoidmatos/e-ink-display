@@ -1,4 +1,6 @@
 // ESP includes
+#include "epd_driver.h"
+#include "epd_internals.h"
 #include "esp_log.h"
 
 // EPD driver includes
@@ -19,6 +21,8 @@
 // Widget includes
 #include "widgets/forecast_base.h"
 #include "widgets/today_base.h"
+#include <stdio.h>
+#include <string.h>
 
 // Own includes
 #include "ui.h"
@@ -154,7 +158,7 @@ uint8_t populate_weather_tab_ui()
 
 	// draw today weather widget
 	EpdRect today_base_widget = { .x = 15 + weather_icon_width / 2 + EPD_WIDTH / 2,
-								  .y = 85,
+								  .y = 0.15 * EPD_HEIGHT,
 								  .width = today_base_width,
 								  .height = today_base_height };
 
@@ -215,7 +219,7 @@ uint8_t write_location_ui(const char* city, const char* country_code)
 uint8_t refresh_weather_tab_ui()
 {
 	xEventGroupWaitBits(ui_cycle_group,
-						LOCATION_DONE_BIT,
+						LOCATION_DONE_BIT | CURRENT_WEATHER_DONE_BIT,
 						pdTRUE, // clear bits
 						pdTRUE, // wait for all bits
 						portMAX_DELAY);
@@ -232,11 +236,166 @@ uint8_t refresh_weather_tab_ui()
 		return 1;
 	}
 
+	location_area = (EpdRect){ .x = 15 + weather_icon_width / 2 + EPD_WIDTH / 2,
+							   .y = 0.15 * EPD_HEIGHT,
+							   .width = today_base_width,
+							   .height = today_base_height };
+
+	epd_err = epd_hl_update_area(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE, location_area);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error updating screen. EPD error code: %d", epd_err);
+		epd_poweroff();
+		return 1;
+	}
+
 	epd_poweroff();
 	return 0;
 }
 
-uint8_t write_current_weather_ui()
+const uint8_t* process_weather_icon(const char* weather_code, const int is_day_time)
 {
+	if (strcmp(weather_code, "CLEAR") == 0 || strcmp(weather_code, "MOSTLY_CLEAR") == 0) {
+		if (is_day_time) {
+			// sun icon
+			return sun_data;
+		} else {
+			// moon icon
+			return moon_data;
+		}
+	} else if (strcmp(weather_code, "PARTLY_CLOUDY") == 0 ||
+			   strcmp(weather_code, "MOSTLY_CLOUDY") == 0 || strcmp(weather_code, "CLOUDY") == 0) {
+		// cloudy icon
+		return cloudy_data;
+	} else if (strcmp(weather_code, "WINDY") == 0) {
+		// wind icon
+		return wind_data;
+	} else if (strcmp(weather_code, "CLOUDY") == 0) {
+		if (is_day_time) {
+			// cloud sun icon
+			return cloudy_data;
+		} else {
+			// cloud moon icon
+			return cloud_moon_data;
+		}
+	} else if (strcmp(weather_code, "LIGHT_RAIN_SHOWERS") == 0 ||
+			   strcmp(weather_code, "CHANCE_OF_SHOWERS") == 0 ||
+			   strcmp(weather_code, "SCATTERED_SHOWERS") == 0 ||
+			   strcmp(weather_code, "LIGHT_RAIN") == 0) {
+		// light rain icon
+		return cloud_drizzle_data;
+	} else if (strcmp(weather_code, "WIND_AND_RAIN") == 0 ||
+			   strcmp(weather_code, "RAIN_SHOWERS") == 0 ||
+			   strcmp(weather_code, "HEAVY_RAIN_SHOWERS") == 0 ||
+			   strcmp(weather_code, "LIGHT_TO_MODERATE_RAIN") == 0 ||
+			   strcmp(weather_code, "MODERATE_TO_HEAVY_RAIN") == 0 ||
+			   strcmp(weather_code, "RAIN") == 0 || strcmp(weather_code, "HEAVY_RAIN") == 0 ||
+			   strcmp(weather_code, "RAIN_PERIODICALLY_HEAVY") == 0) {
+		// heavy rain icon
+		return cloud_rain_data;
+	} else if (strcmp(weather_code, "LIGHT_SNOW_SHOWERS") == 0 ||
+			   strcmp(weather_code, "CHANCE_OF_SNOW_SHOWERS") == 0 ||
+			   strcmp(weather_code, "SCATTERED_SNOW_SHOWERS") == 0 ||
+			   strcmp(weather_code, "SNOW_SHOWERS") == 0 ||
+			   strcmp(weather_code, "HEAVY_SNOW_SHOWERS") == 0 ||
+			   strcmp(weather_code, "LIGHT_TO_MODERATE_SNOW") == 0 ||
+			   strcmp(weather_code, "MODERATE_TO_HEAVY_SNOW") == 0 ||
+			   strcmp(weather_code, "SNOW") == 0 || strcmp(weather_code, "LIGHT_SNOW") == 0 ||
+			   strcmp(weather_code, "HEAVY_SNOW") == 0 || strcmp(weather_code, "SNOWSTORM") == 0 ||
+			   strcmp(weather_code, "SNOW_PERIODICALLY_HEAVY") == 0 ||
+			   strcmp(weather_code, "HEAVY_SNOW_STORM") == 0 ||
+			   strcmp(weather_code, "BLOWING_SNOW") == 0 ||
+			   strcmp(weather_code, "RAIN_AND_SNOW") == 0) {
+		// snow icon
+		return snowflake_data;
+	} else if (strcmp(weather_code, "HAIL") == 0 || strcmp(weather_code, "HAIL_SHOWERS") == 0) {
+		// hail icon
+		return cloud_hail_data;
+	} else if (strcmp(weather_code, "THUNDERSTORM") == 0 ||
+			   strcmp(weather_code, "THUNDERSHOWER") == 0 ||
+			   strcmp(weather_code, "LIGHT_THUNDERSTORM_RAIN") == 0 ||
+			   strcmp(weather_code, "SCATTERED_THUNDERSTORMS") == 0 ||
+			   strcmp(weather_code, "HEAVY_THUNDERSTORM") == 0) {
+		// thunderstorm icon
+		return cloud_lightning_data;
+	} else {
+		// default icon
+		return sun_data;
+	}
+}
+
+uint8_t write_current_weather_ui(const current_weather_t* weather)
+{
+	const int box_x = 15 + weather_icon_width / 2 + EPD_WIDTH / 2;
+	const int box_y = 0.15 * EPD_HEIGHT;
+	// draw horizontal divider
+	epd_draw_hline(box_x + (int)(0.05 * today_base_width),
+				   box_y + 0.75 * today_base_height,
+				   0.9 * today_base_width,
+				   MID_GRAY,
+				   fb);
+
+	// draw additional information icons
+	const int icon_y = 0.8 * today_base_height + box_y;
+	int icon_x = box_x + 0.05 * today_base_width;
+	int icon_spacing = 0.9 * today_base_width / 4;
+
+	EpdRect weather_icon = {
+		.x = icon_x, .y = icon_y, .width = weather_icon_width, .height = weather_icon_height
+	};
+
+	char buffer[16];
+	int cursor_x = icon_x + weather_icon_width + 5;
+	int cursor_y = icon_y + weather_icon_height - 5;
+
+	// humidity
+	epd_copy_to_framebuffer(weather_icon, droplets_data, fb);
+	sprintf(buffer, "%3d %%", weather->humidity);
+
+	enum EpdDrawError epd_err =
+	  epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting location string. EPD error code: %d", epd_err);
+		return 1;
+	}
+
+	// wind speed
+	weather_icon.x = cursor_x + 20;
+	epd_copy_to_framebuffer(weather_icon, wind_data, fb);
+	sprintf(buffer, "%2d kph", weather->wind_speed_kph);
+	cursor_x = weather_icon.x + weather_icon.width + 5;
+	cursor_y = weather_icon.y + weather_icon.height - 5;
+	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting location string. EPD error code: %d", epd_err);
+		return 1;
+	}
+
+	// rain chance
+	weather_icon.x = cursor_x + 20;
+	epd_copy_to_framebuffer(weather_icon, cloud_rain_data, fb);
+	sprintf(buffer, "%2d %%", weather->rain_chance);
+	cursor_x = weather_icon.x + weather_icon.width + 5;
+	cursor_y = weather_icon.y + weather_icon.height - 5;
+	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting location string. EPD error code: %d", epd_err);
+		return 1;
+	}
+
+	// UV index
+	weather_icon.x = cursor_x + 20;
+	epd_copy_to_framebuffer(weather_icon, sun_data, fb);
+	sprintf(buffer, "UV %d", weather->uv_index);
+	cursor_x = weather_icon.x + weather_icon.width + 5;
+	cursor_y = weather_icon.y + weather_icon.height - 5;
+	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting location string. EPD error code: %d", epd_err);
+		return 1;
+	}
+
+	// signal current weather done
+	xEventGroupSetBits(ui_cycle_group, CURRENT_WEATHER_DONE_BIT);
 	return 0;
 }

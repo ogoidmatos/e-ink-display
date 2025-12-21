@@ -69,6 +69,48 @@ static void location_task(void* args)
 	vTaskDelete(NULL);
 }
 
+void parse_weather_json(cJSON* json, current_weather_t* weather)
+{
+	// Parse JSON data for weather
+	weather->is_day_time = cJSON_GetObjectItem(json, "isDayTime")->valueint;
+
+	cJSON* weatherCondition = cJSON_GetObjectItem(json, "weatherCondition");
+	const char* desc =
+	  cJSON_GetObjectItem(cJSON_GetObjectItem(weatherCondition, "description"), "text")
+		->valuestring;
+	strncpy(weather->description, desc, sizeof(weather->description) - 1);
+
+	const char* code = cJSON_GetObjectItem(weatherCondition, "type")->valuestring;
+	strncpy(weather->weather_code, code, sizeof(weather->weather_code) - 1);
+
+	weather->temperature_c =
+	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(json, "temperature"), "degrees")->valuedouble;
+	weather->feels_like_temperature_c =
+	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(json, "feelsLikeTemperature"), "degrees")
+		->valuedouble;
+	weather->humidity = cJSON_GetObjectItem(json, "relativeHumidity")->valueint;
+	weather->uv_index = cJSON_GetObjectItem(json, "uvIndex")->valueint;
+
+	cJSON* current_conditions = cJSON_GetObjectItem(json, "currentConditionsHistory");
+	weather->max_temperature_c =
+	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(current_conditions, "maxTemperature"),
+								 "degrees")
+		->valuedouble;
+	weather->min_temperature_c =
+	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(current_conditions, "minTemperature"),
+								 "degrees")
+		->valuedouble;
+
+	weather->wind_speed_kph =
+	  cJSON_GetObjectItem(cJSON_GetObjectItem(cJSON_GetObjectItem(json, "wind"), "speed"), "value")
+		->valueint;
+
+	weather->rain_chance =
+	  cJSON_GetObjectItem(
+		cJSON_GetObjectItem(cJSON_GetObjectItem(json, "precipitation"), "probability"), "percent")
+		->valueint;
+}
+
 static void current_weather_task(void* args)
 {
 	// wait on queue to receive location from ip api if location is dynamic
@@ -112,46 +154,29 @@ static void current_weather_task(void* args)
 		return;
 	}
 
-	// Parse JSON data for weather
-	const int is_day_time = cJSON_GetObjectItem(json, "isDayTime")->valueint;
-	const cJSON* weatherCondition = cJSON_GetObjectItem(json, "weatherCondition");
-	const char* description =
-	  cJSON_GetObjectItem(cJSON_GetObjectItem(weatherCondition, "description"), "text")
-		->valuestring;
-	const char* weather_code = cJSON_GetObjectItem(weatherCondition, "type")->valuestring;
-	const float temperature_c =
-	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(json, "temperature"), "degrees")->valuedouble;
-	const float feels_like_temperature_c =
-	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(json, "feelsLikeTemperature"), "degrees")
-		->valuedouble;
-	const int humidity = cJSON_GetObjectItem(json, "relativeHumidity")->valueint;
-	const int uv_index = cJSON_GetObjectItem(json, "uvIndex")->valueint;
-	const cJSON* current_conditions = cJSON_GetObjectItem(json, "currentConditionsHistory");
-	const float max_temperature_c =
-	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(current_conditions, "maxTemperature"),
-								 "degrees")
-		->valuedouble;
-	const float min_temperature_c =
-	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(current_conditions, "minTemperature"),
-								 "degrees")
-		->valuedouble;
-	const int wind_speed_kph =
-	  cJSON_GetObjectItem(cJSON_GetObjectItem(cJSON_GetObjectItem(json, "wind"), "speed"), "value")
-		->valueint;
+	// Create and populate the weather struct
+	current_weather_t weather = { 0 };
+	parse_weather_json(json, &weather);
 
 	ESP_LOGD(LOG_TAG_TASK_MANAGER,
 			 "Weather: %s, Code: %s, Temp: %.2fC, Feels like: %.2fC, Humidity: %d%%, UV Index: %d, "
-			 "Max Temp: %.2fC, Min Temp: %.2fC, Is Day Time: %d",
-			 description,
-			 weather_code,
-			 temperature_c,
-			 feels_like_temperature_c,
-			 humidity,
-			 uv_index,
-			 max_temperature_c,
-			 min_temperature_c,
-			 is_day_time,
-			 wind_speed_kph);
+			 "Max Temp: %.2fC, Min Temp: %.2fC, Is Day Time: %d, Wind: %d kph, Rain Chance: %d%%",
+			 weather.description,
+			 weather.weather_code,
+			 weather.temperature_c,
+			 weather.feels_like_temperature_c,
+			 weather.humidity,
+			 weather.uv_index,
+			 weather.max_temperature_c,
+			 weather.min_temperature_c,
+			 weather.is_day_time,
+			 weather.wind_speed_kph,
+			 weather.rain_chance);
+
+	err = write_current_weather_ui(&weather);
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing current weather to UI.");
+	}
 
 	cJSON_Delete(json);
 	vTaskDelete(NULL);
