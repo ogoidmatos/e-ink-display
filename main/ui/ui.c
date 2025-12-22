@@ -12,6 +12,7 @@
 
 // Font includes
 #include "fonts/segoevf_11.h"
+#include "fonts/segoevf_24.h"
 #include "fonts/segoevf_9.h"
 
 // Icon includes
@@ -37,6 +38,7 @@ static uint8_t* fb;
 static SemaphoreHandle_t fb_mutex;
 static EventGroupHandle_t ui_cycle_group;
 
+static const EpdFont* const font_24 = &SegoeVF_24;
 static const EpdFont* const font_11 = &SegoeVF_11;
 static const EpdFont* const font_9 = &SegoeVF_9;
 
@@ -347,7 +349,7 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 		.x = icon_x, .y = icon_y_low, .width = weather_icon_width, .height = weather_icon_height
 	};
 
-	char buffer[16];
+	char buffer[32];
 	int cursor_x = icon_x + weather_icon_width + 5;
 	int cursor_y = icon_y_low + weather_icon_height - 5;
 
@@ -369,7 +371,7 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 	cursor_x = icon_x + weather_icon_width + 5;
 	cursor_y = icon_y_high + weather_icon_height - 5;
 	epd_copy_to_framebuffer(weather_icon, arrow_up_data, fb);
-	sprintf(buffer, "%2.1f º", weather->max_temperature_c);
+	sprintf(buffer, "%2.1f ºC", weather->max_temperature_c);
 
 	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
 
@@ -395,7 +397,7 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 	// minimum temperature
 	weather_icon.y = icon_y_high;
 	epd_copy_to_framebuffer(weather_icon, arrow_down_data, fb);
-	sprintf(buffer, "%2.1f º", weather->min_temperature_c);
+	sprintf(buffer, "%2.1f ºC", weather->min_temperature_c);
 	cursor_x = weather_icon.x + weather_icon.width + 5;
 	cursor_y = weather_icon.y + weather_icon.height - 5;
 	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
@@ -455,11 +457,43 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 		return 1;
 	}
 
+	// draw main weather icon
 	weather_icon = (EpdRect){ .x = box_x + 0.7 * today_base_width,
 							  .y = box_y + 0.1 * today_base_height,
 							  .width = weather_large_width,
 							  .height = weather_large_height };
-	epd_copy_to_framebuffer(weather_icon, sun_large_data, fb);
+	epd_copy_to_framebuffer(
+	  weather_icon, process_weather_icon(weather->weather_code, weather->is_day_time, true), fb);
+
+	// write temperature
+	sprintf(buffer, "%2.1fº", weather->temperature_c);
+	cursor_x = box_x + 0.05 * today_base_width;
+	cursor_y = box_y + 0.3 * today_base_height;
+	epd_err = epd_write_string(font_24, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting temperature. EPD error code: %d", epd_err);
+		return 1;
+	}
+
+	// write weather description
+	sprintf(buffer, "%s", weather->description);
+	cursor_x = box_x + 0.05 * today_base_width;
+	cursor_y = box_y + 0.45 * today_base_height;
+	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting weather description. EPD error code: %d", epd_err);
+		return 1;
+	}
+
+	// write feels like temperature
+	sprintf(buffer, "Feels like %2.1fº", weather->feels_like_temperature_c);
+	cursor_x = box_x + 0.05 * today_base_width;
+	cursor_y = box_y + 0.55 * today_base_height;
+	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &subtitle_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting feels like temperature. EPD error code: %d", epd_err);
+		return 1;
+	}
 
 	// signal current weather done
 	xEventGroupSetBits(ui_cycle_group, CURRENT_WEATHER_DONE_BIT);
