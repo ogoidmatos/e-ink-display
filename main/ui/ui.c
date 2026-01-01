@@ -22,12 +22,6 @@
 #include "icons/weather_icons.h"
 #include "icons/weather_icons_large.h"
 
-// Widget includes
-#include "widgets/forecast_base.h"
-#include "widgets/today_base.h"
-#include <stdio.h>
-#include <string.h>
-
 // Own includes
 #include "ui.h"
 
@@ -92,6 +86,16 @@ uint8_t init_ui()
 
 	epd_poweroff();
 	return 0;
+}
+
+void draw_fancy_rect(EpdRect rect, uint8_t margin, uint8_t color, uint8_t* framebuffer)
+{
+	epd_draw_hline(rect.x + margin, rect.y, rect.width - 2 * margin, color, framebuffer);
+	epd_draw_hline(
+	  rect.x + margin, rect.y + rect.height - 1, rect.width - 2 * margin, color, framebuffer);
+	epd_draw_vline(rect.x, rect.y + margin, rect.height - 2 * margin, color, framebuffer);
+	epd_draw_vline(
+	  rect.x + rect.width - 1, rect.y + margin, rect.height - 2 * margin, color, framebuffer);
 }
 
 uint8_t populate_base_ui()
@@ -164,14 +168,15 @@ uint8_t populate_weather_tab_ui()
 	// draw today weather widget
 	EpdRect today_base_widget = { .x = 15 + weather_icon_width / 2 + EPD_WIDTH / 2,
 								  .y = 0.15 * EPD_HEIGHT,
-								  .width = today_base_width,
-								  .height = today_base_height };
+								  .width = CURRENT_WEATHER_WIDGET_WIDTH,
+								  .height = CURRENT_WEATHER_WIDGET_HEIGHT };
 
-	epd_copy_to_framebuffer(today_base_widget, today_base_data, fb);
+	// epd_copy_to_framebuffer(today_base_widget, today_base_data, fb);
+	draw_fancy_rect(today_base_widget, 10, BLACK, fb);
 
 	// write upcoming
 	cursor_x = today_base_widget.x;
-	cursor_y = today_base_widget.y + today_base_height + 35;
+	cursor_y = today_base_widget.y + CURRENT_WEATHER_WIDGET_HEIGHT + 35;
 	char upcoming[] = "Upcoming";
 
 	epd_err = epd_write_string(font_9, upcoming, &cursor_x, &cursor_y, fb, &header_font_props);
@@ -183,14 +188,14 @@ uint8_t populate_weather_tab_ui()
 	// draw forecast widgets
 	EpdRect forecast_base_widget = { .x = today_base_widget.x,
 									 .y = cursor_y,
-									 .width = forecast_base_width,
-									 .height = forecast_base_height };
+									 .width = FORECAST_WEATHER_WIDGET_WIDTH,
+									 .height = FORECAST_WEATHER_WIDGET_HEIGHT };
 
-	epd_copy_to_framebuffer(forecast_base_widget, forecast_base_data, fb);
+	draw_fancy_rect(forecast_base_widget, 10, BLACK, fb);
 
-	forecast_base_widget.y += forecast_base_height + 20;
+	forecast_base_widget.y += FORECAST_WEATHER_WIDGET_HEIGHT + 20;
 
-	epd_copy_to_framebuffer(forecast_base_widget, forecast_base_data, fb);
+	draw_fancy_rect(forecast_base_widget, 10, BLACK, fb);
 
 	return 0;
 }
@@ -243,8 +248,8 @@ uint8_t refresh_weather_tab_ui()
 
 	location_area = (EpdRect){ .x = 15 + weather_icon_width / 2 + EPD_WIDTH / 2,
 							   .y = 0.15 * EPD_HEIGHT,
-							   .width = today_base_width,
-							   .height = today_base_height };
+							   .width = CURRENT_WEATHER_WIDGET_WIDTH,
+							   .height = CURRENT_WEATHER_WIDGET_HEIGHT };
 
 	epd_err = epd_hl_update_area(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE, location_area);
 	if (epd_err != EPD_DRAW_SUCCESS) {
@@ -333,17 +338,19 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 	const int box_x = 15 + weather_icon_width / 2 + EPD_WIDTH / 2;
 	const int box_y = 0.15 * EPD_HEIGHT;
 	// draw horizontal divider
-	epd_draw_hline(box_x + (int)(0.05 * today_base_width),
-				   box_y + 0.75 * today_base_height,
-				   0.9 * today_base_width,
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
+	epd_draw_hline(box_x + (int)(0.05 * CURRENT_WEATHER_WIDGET_WIDTH),
+				   box_y + 0.8 * CURRENT_WEATHER_WIDGET_HEIGHT,
+				   0.9 * CURRENT_WEATHER_WIDGET_WIDTH,
 				   MID_GRAY,
 				   fb);
+	xSemaphoreGive(fb_mutex);
 
 	// draw additional information icons
-	int icon_y_low = 0.8 * today_base_height + box_y;
-	int icon_y_high = 0.6 * today_base_height + box_y;
+	int icon_y_low = 0.85 * CURRENT_WEATHER_WIDGET_HEIGHT + box_y;
+	int icon_y_high = 0.65 * CURRENT_WEATHER_WIDGET_HEIGHT + box_y;
 
-	int icon_x = box_x + 0.05 * today_base_width;
+	int icon_x = box_x + 0.05 * CURRENT_WEATHER_WIDGET_WIDTH;
 
 	EpdRect weather_icon = {
 		.x = icon_x, .y = icon_y_low, .width = weather_icon_width, .height = weather_icon_height
@@ -354,11 +361,15 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 	int cursor_y = icon_y_low + weather_icon_height - 5;
 
 	// humidity
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(weather_icon, droplets_data, fb);
+	xSemaphoreGive(fb_mutex);
 	sprintf(buffer, "%3d %%", weather->humidity);
 
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	enum EpdDrawError epd_err =
 	  epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
 
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting humidity. EPD error code: %d", epd_err);
@@ -370,10 +381,14 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 	weather_icon.y = icon_y_high;
 	cursor_x = icon_x + weather_icon_width + 5;
 	cursor_y = icon_y_high + weather_icon_height - 5;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(weather_icon, arrow_up_data, fb);
+	xSemaphoreGive(fb_mutex);
 	sprintf(buffer, "%2.1f ºC", weather->max_temperature_c);
 
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
 
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting maximum temperature. EPD error code: %d", epd_err);
@@ -383,11 +398,15 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 	// wind speed
 	weather_icon.x = next_icon_x;
 	weather_icon.y = icon_y_low;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(weather_icon, wind_data, fb);
+	xSemaphoreGive(fb_mutex);
 	sprintf(buffer, "%2d kph", weather->wind_speed_kph);
 	cursor_x = weather_icon.x + weather_icon.width + 5;
 	cursor_y = weather_icon.y + weather_icon.height - 5;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting wind speed. EPD error code: %d", epd_err);
 		return 1;
@@ -396,11 +415,15 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 
 	// minimum temperature
 	weather_icon.y = icon_y_high;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(weather_icon, arrow_down_data, fb);
+	xSemaphoreGive(fb_mutex);
 	sprintf(buffer, "%2.1f ºC", weather->min_temperature_c);
 	cursor_x = weather_icon.x + weather_icon.width + 5;
 	cursor_y = weather_icon.y + weather_icon.height - 5;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting minimum temperature. EPD error code: %d", epd_err);
 		return 1;
@@ -409,11 +432,15 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 	// rain chance
 	weather_icon.x = next_icon_x;
 	weather_icon.y = icon_y_low;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(weather_icon, cloud_rain_data, fb);
+	xSemaphoreGive(fb_mutex);
 	sprintf(buffer, "%2d %%", weather->rain_chance);
 	cursor_x = weather_icon.x + weather_icon.width + 5;
 	cursor_y = weather_icon.y + weather_icon.height - 5;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting rain chance. EPD error code: %d", epd_err);
 		return 1;
@@ -422,11 +449,15 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 
 	// sunrise - TODO: FINALIZE WITH DYNAMIC DATA
 	weather_icon.y = icon_y_high;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(weather_icon, sunrise_data, fb);
+	xSemaphoreGive(fb_mutex);
 	sprintf(buffer, "10:10");
 	cursor_x = weather_icon.x + weather_icon.width + 5;
 	cursor_y = weather_icon.y + weather_icon.height - 5;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting sunrise time. EPD error code: %d", epd_err);
 		return 1;
@@ -435,11 +466,15 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 	// UV index
 	weather_icon.x = next_icon_x;
 	weather_icon.y = icon_y_low;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(weather_icon, sun_data, fb);
+	xSemaphoreGive(fb_mutex);
 	sprintf(buffer, "UV %d", weather->uv_index);
 	cursor_x = weather_icon.x + weather_icon.width + 5;
 	cursor_y = weather_icon.y + weather_icon.height - 5;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting UV index. EPD error code: %d", epd_err);
 		return 1;
@@ -447,29 +482,37 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 
 	// sunset - TODO: FINALIZE WITH DYNAMIC DATA
 	weather_icon.y = icon_y_high;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(weather_icon, sunset_data, fb);
+	xSemaphoreGive(fb_mutex);
 	sprintf(buffer, "19:00");
 	cursor_x = weather_icon.x + weather_icon.width + 5;
 	cursor_y = weather_icon.y + weather_icon.height - 5;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting sunset time. EPD error code: %d", epd_err);
 		return 1;
 	}
 
 	// draw main weather icon
-	weather_icon = (EpdRect){ .x = box_x + 0.7 * today_base_width,
-							  .y = box_y + 0.1 * today_base_height,
+	weather_icon = (EpdRect){ .x = box_x + 0.7 * CURRENT_WEATHER_WIDGET_WIDTH,
+							  .y = box_y + 0.1 * CURRENT_WEATHER_WIDGET_HEIGHT,
 							  .width = weather_large_width,
 							  .height = weather_large_height };
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(
 	  weather_icon, process_weather_icon(weather->weather_code, weather->is_day_time, true), fb);
+	xSemaphoreGive(fb_mutex);
 
 	// write temperature
 	sprintf(buffer, "%2.1fº", weather->temperature_c);
-	cursor_x = box_x + 0.05 * today_base_width;
-	cursor_y = box_y + 0.3 * today_base_height;
+	cursor_x = box_x + 0.05 * CURRENT_WEATHER_WIDGET_WIDTH;
+	cursor_y = box_y + 0.3 * CURRENT_WEATHER_WIDGET_HEIGHT;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_err = epd_write_string(font_24, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting temperature. EPD error code: %d", epd_err);
 		return 1;
@@ -477,9 +520,11 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 
 	// write weather description
 	sprintf(buffer, "%s", weather->description);
-	cursor_x = box_x + 0.05 * today_base_width;
-	cursor_y = box_y + 0.45 * today_base_height;
+	cursor_x = box_x + 0.05 * CURRENT_WEATHER_WIDGET_WIDTH;
+	cursor_y = box_y + 0.45 * CURRENT_WEATHER_WIDGET_HEIGHT;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting weather description. EPD error code: %d", epd_err);
 		return 1;
@@ -487,9 +532,11 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 
 	// write feels like temperature
 	sprintf(buffer, "Feels like %2.1fº", weather->feels_like_temperature_c);
-	cursor_x = box_x + 0.05 * today_base_width;
-	cursor_y = box_y + 0.55 * today_base_height;
+	cursor_x = box_x + 0.05 * CURRENT_WEATHER_WIDGET_WIDTH;
+	cursor_y = box_y + 0.57 * CURRENT_WEATHER_WIDGET_HEIGHT;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &subtitle_font_props);
+	xSemaphoreGive(fb_mutex);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting feels like temperature. EPD error code: %d", epd_err);
 		return 1;
