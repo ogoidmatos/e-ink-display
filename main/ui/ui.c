@@ -30,7 +30,6 @@ static EpdiyHighlevelState hl;
 static uint8_t* fb;
 
 static SemaphoreHandle_t fb_mutex;
-static EventGroupHandle_t ui_cycle_group;
 
 static const EpdFont* const font_24 = &SegoeVF_24;
 static const EpdFont* const font_11 = &SegoeVF_11;
@@ -50,12 +49,6 @@ uint8_t init_ui()
 	fb_mutex = xSemaphoreCreateMutex();
 	if (fb_mutex == NULL) {
 		ESP_LOGE(LOG_TAG_UI, "Error creating framebuffer mutex.");
-		return 1;
-	}
-
-	ui_cycle_group = xEventGroupCreate();
-	if (ui_cycle_group == NULL) {
-		ESP_LOGE(LOG_TAG_UI, "Error creating UI cycle event group.");
 		return 1;
 	}
 
@@ -220,19 +213,11 @@ uint8_t write_location_ui(const char* city, const char* country_code)
 		return 1;
 	}
 
-	// signal location done
-	xEventGroupSetBits(ui_cycle_group, LOCATION_DONE_BIT);
-
 	return 0;
 }
 
 uint8_t refresh_weather_tab_ui()
 {
-	xEventGroupWaitBits(ui_cycle_group,
-						LOCATION_DONE_BIT | CURRENT_WEATHER_DONE_BIT,
-						pdTRUE, // clear bits
-						pdTRUE, // wait for all bits
-						portMAX_DELAY);
 	epd_poweron();
 
 	// Estimate of area to update
@@ -542,8 +527,6 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 		return 1;
 	}
 
-	// signal current weather done
-	xEventGroupSetBits(ui_cycle_group, CURRENT_WEATHER_DONE_BIT);
 	return 0;
 }
 // dow(m,d,y){y-=m<3;return(y+y/4-y/100+y/400+"-bed=pen+mad."[m]+d)%7;}

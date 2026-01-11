@@ -10,7 +10,6 @@
 
 // FreeRTOS includes
 #include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
 #include "freertos/task.h"
 
 // Own includes
@@ -18,10 +17,16 @@
 #include "task_manager.h"
 #include "ui/ui.h"
 
-static QueueHandle_t location_queue = NULL;
+static EventGroupHandle_t ui_cycle_group;
+static location_t cached_location;
 
 static void location_task(void* args)
 {
+	if (ui_cycle_group == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "UI cycle event group is NULL.");
+		return;
+	}
+
 	char* http_output_buffer = calloc(MAX_HTTP_OUTPUT_BUFFER, sizeof(char));
 	if (http_output_buffer == NULL) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error allocating memory for HTTP output buffer.");
@@ -48,12 +53,9 @@ static void location_task(void* args)
 	const float longitude = (float)cJSON_GetObjectItem(json, "lon")->valuedouble;
 	ESP_LOGD(LOG_TAG_TASK_MANAGER, "Latitude: %f, Longitude: %f", latitude, longitude);
 
-	// pass latitude and longitude in a queue to the weather task to ensure that it runs
+	// pass latitude and longitude to static variable so that the weather tasks run
 	// after the location is fetched
-	location_t current_location = { latitude, longitude };
-	if (xQueueSend(location_queue, (void*)&current_location, pdMS_TO_TICKS(1000)) != pdPASS) {
-		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error sending location to queue.");
-	}
+	cached_location = (location_t){ latitude, longitude };
 
 	const char* city = cJSON_GetObjectItem(json, "city")->valuestring;
 	const char* country_code = cJSON_GetObjectItem(json, "countryCode")->valuestring;
@@ -63,6 +65,9 @@ static void location_task(void* args)
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing location to UI.");
 	}
+
+	// signal location done
+	xEventGroupSetBits(ui_cycle_group, LOCATION_DONE_BIT);
 
 	cJSON_Delete(json);
 
@@ -113,16 +118,16 @@ void parse_weather_json(cJSON* json, current_weather_t* weather)
 
 static void current_weather_task(void* args)
 {
-	// wait on queue to receive location from ip api if location is dynamic
-	if (location_queue == NULL) {
-		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Location queue is NULL.");
+	// wait on bits to receive location from ip api if location is dynamic
+	if (ui_cycle_group == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "UI cycle event group is NULL.");
 		return;
 	}
-	location_t current_location;
-	if (xQueueReceive(location_queue, &current_location, portMAX_DELAY) != pdPASS) {
-		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error receiving location from queue.");
-		return;
-	}
+	xEventGroupWaitBits(ui_cycle_group,
+						LOCATION_DONE_BIT,
+						pdFALSE, // do not clear bits
+						pdTRUE,	 // wait for all bits
+						portMAX_DELAY);
 
 	char* http_output_buffer = calloc(MAX_HTTP_OUTPUT_BUFFER, sizeof(char));
 	if (http_output_buffer == NULL) {
@@ -131,13 +136,16 @@ static void current_weather_task(void* args)
 		return;
 	}
 
-	char url[256];
+	char url[400];
 	sprintf(url,
-			"https://weather.googleapis.com/v1/"
-			"currentConditions:lookup?key=%s&location.latitude=%f&location.longitude=%f",
+			"https://weather.googleapis.com/v1/currentConditions:lookup"
+			"?key=%s&location.latitude=%f&location.longitude=%f&prettyPrint=false&fields=isDaytime,"
+			"weatherCondition(description,type),temperature,feelsLikeTemperature,relativeHumidity,"
+			"uvIndex,precipitation(probability),wind(speed),currentConditionsHistory("
+			"maxTemperature,minTemperature)",
 			WEATHER_API_KEY,
-			current_location.latitude,
-			current_location.longitude);
+			cached_location.latitude,
+			cached_location.longitude);
 
 	uint8_t err = https_get_request(url, http_output_buffer);
 	if (err != 0) {
@@ -145,6 +153,7 @@ static void current_weather_task(void* args)
 		free(http_output_buffer);
 		return;
 	}
+
 	// write buffer into JSON object and free buffer
 	cJSON* json = cJSON_Parse(http_output_buffer);
 	free(http_output_buffer);
@@ -177,6 +186,8 @@ static void current_weather_task(void* args)
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing current weather to UI.");
 	}
+	// signal current weather done
+	xEventGroupSetBits(ui_cycle_group, CURRENT_WEATHER_DONE_BIT);
 
 	cJSON_Delete(json);
 	vTaskDelete(NULL);
@@ -184,10 +195,71 @@ static void current_weather_task(void* args)
 
 static void refresh_task(void* args)
 {
+	// wait on bits to receive location and current weather
+	if (ui_cycle_group == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "UI cycle event group is NULL.");
+		return;
+	}
+	xEventGroupWaitBits(ui_cycle_group,
+						LOCATION_DONE_BIT | CURRENT_WEATHER_DONE_BIT,
+						pdTRUE, // clear bits
+						pdTRUE, // wait for all bits
+						portMAX_DELAY);
 	uint8_t err = refresh_weather_tab_ui();
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error refreshing weather tab UI.");
 	}
+	vTaskDelete(NULL);
+}
+
+static void forecast_weather_task(void* args)
+{
+	// wait on bits to receive location from ip api if location is dynamic
+	if (ui_cycle_group == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "UI cycle event group is NULL.");
+		return;
+	}
+	xEventGroupWaitBits(ui_cycle_group,
+						LOCATION_DONE_BIT,
+						pdFALSE, // do not clear bits
+						pdTRUE,	 // wait for all bits
+						portMAX_DELAY);
+
+	char* http_output_buffer = calloc(MAX_HTTP_OUTPUT_BUFFER, sizeof(char));
+	if (http_output_buffer == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error allocating memory for HTTP output buffer.");
+		free(http_output_buffer);
+		return;
+	}
+
+	char url[360];
+	sprintf(url,
+			"https://weather.googleapis.com/v1/forecast/days:lookup"
+			"?key=%s&location.latitude=%f&location.longitude=%f&days=3&prettyPrint=false&fields="
+			"forecastDays(displayDate,maxTemperature,minTemperature,daytimeForecast("
+			"weatherCondition(description,type),precipitation(probability)))",
+			WEATHER_API_KEY,
+			cached_location.latitude,
+			cached_location.longitude);
+
+	uint8_t err = https_get_request(url, http_output_buffer);
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error performing HTTPS GET request.");
+		free(http_output_buffer);
+		return;
+	}
+	// // write buffer into JSON object and free buffer
+	// cJSON* json = cJSON_Parse(http_output_buffer);
+	// free(http_output_buffer);
+
+	// if (json == NULL) {
+	// 	ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error parsing JSON response.");
+	// 	return;
+	// }
+	// print the JSON response for debugging
+	ESP_LOGI(LOG_TAG_TASK_MANAGER, "Forecast JSON: %s", http_output_buffer);
+
+	// cJSON_Delete(json);
 	vTaskDelete(NULL);
 }
 
@@ -209,12 +281,6 @@ uint8_t start_location_task()
 			 longitude);
 	return 0;
 #else
-	location_queue = xQueueCreate(2, sizeof(location_t));
-	if (location_queue == NULL) {
-		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating location queue.");
-		return 1;
-	}
-
 	uint8_t err = xTaskCreate(location_task, "location_task", 4096, NULL, 5, NULL);
 	if (err != pdPASS) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating location task.");
@@ -229,15 +295,26 @@ uint8_t start_weather_tasks()
 {
 	uint8_t err = xTaskCreate(current_weather_task, "current_weather_task", 4096, NULL, 5, NULL);
 	if (err != pdPASS) {
-		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating weather task.");
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating current weather task.");
 		return 1;
 	}
-	ESP_LOGD(LOG_TAG_TASK_MANAGER, "Weather task created.");
+	err = xTaskCreate(forecast_weather_task, "forecast_weather_task", 4096, NULL, 5, NULL);
+	if (err != pdPASS) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating forecast weather task.");
+		return 1;
+	}
+	ESP_LOGD(LOG_TAG_TASK_MANAGER, "Weather tasks created.");
 	return 0;
 }
 
 uint8_t start_refresh_task()
 {
+	ui_cycle_group = xEventGroupCreate();
+	if (ui_cycle_group == NULL) {
+		ESP_LOGE(LOG_TAG_UI, "Error creating UI cycle event group.");
+		return 1;
+	}
+
 	uint8_t err = xTaskCreate(refresh_task, "refresh_task", 4096, NULL, 5, NULL);
 	if (err != pdPASS) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating refresh task.");

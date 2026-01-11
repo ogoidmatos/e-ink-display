@@ -17,9 +17,6 @@
 #define FORECAST_WEATHER_WIDGET_WIDTH 400
 #define FORECAST_WEATHER_WIDGET_HEIGHT 60
 
-#define LOCATION_DONE_BIT (1 << 0)
-#define CURRENT_WEATHER_DONE_BIT (1 << 1)
-
 typedef struct current_weather {
     char description[32];
     char weather_code[32];

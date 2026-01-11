@@ -14,6 +14,9 @@ typedef struct location {
     float longitude;
 } location_t;
 
+#define LOCATION_DONE_BIT (1 << 0)
+#define CURRENT_WEATHER_DONE_BIT (1 << 1)
+
 uint8_t start_location_task();
 uint8_t start_weather_tasks();
 uint8_t start_refresh_task();
