@@ -105,18 +105,6 @@ uint8_t populate_base_ui()
 		return 1;
 	}
 
-	// write date
-	// TODO: make dynamic
-	cursor_x = 52;
-	cursor_y = 62;
-	char date[] = "Monday, 1 Jan 2024";
-
-	epd_err = epd_write_string(font_9, date, &cursor_x, &cursor_y, fb, &subtitle_font_props);
-	if (epd_err != EPD_DRAW_SUCCESS) {
-		ESP_LOGE(LOG_TAG_UI, "Error writting date string. EPD error code: %d", epd_err);
-		return 1;
-	}
-
 	// draw calendar icon
 	EpdRect calendar_icon = {
 		.x = 15, .y = 13, .width = calendar_width, .height = calendar_height
@@ -216,27 +204,76 @@ uint8_t write_location_ui(const char* city, const char* country_code)
 	return 0;
 }
 
+uint8_t day_of_the_week(uint8_t d, uint8_t m, uint16_t y)
+{
+	y -= m < 3;
+	return (y + y / 4 - y / 100 + y / 400 + "-bed=pen+mad."[m] + d) % 7;
+}
+
+uint8_t write_date_ui(uint16_t year, uint8_t month, uint8_t day)
+{
+	// write date
+	int cursor_x = 52;
+	int cursor_y = 62;
+	char date[32];
+	const char month_str[12][4] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+									"Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+	const char day_str[7][10] = { "Sunday",	  "Monday", "Tuesday", "Wednesday",
+								  "Thursday", "Friday", "Saturday" };
+
+	sprintf(date,
+			"%s, %02d %s %04d",
+			day_str[day_of_the_week(day, month, year)],
+			day,
+			month_str[month - 1],
+			year);
+
+	ESP_LOGD(LOG_TAG_UI, "%s", date);
+
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
+	enum EpdDrawError epd_err =
+	  epd_write_string(font_9, date, &cursor_x, &cursor_y, fb, &subtitle_font_props);
+	xSemaphoreGive(fb_mutex);
+
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting date string. EPD error code: %d", epd_err);
+		return 1;
+	}
+
+	return 0;
+}
+
 uint8_t refresh_weather_tab_ui()
 {
 	epd_poweron();
 
 	// Estimate of area to update
-	EpdRect location_area = { .x = 52 + EPD_WIDTH / 2, .y = 42, .width = 200, .height = 30 };
+	EpdRect refresh_area = { .x = 52 + EPD_WIDTH / 2, .y = 42, .width = 120, .height = 30 };
 
 	enum EpdDrawError epd_err =
-	  epd_hl_update_area(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE, location_area);
+	  epd_hl_update_area(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE, refresh_area);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error updating screen. EPD error code: %d", epd_err);
 		epd_poweroff();
 		return 1;
 	}
 
-	location_area = (EpdRect){ .x = 15 + weather_icon_width / 2 + EPD_WIDTH / 2,
-							   .y = 0.15 * EPD_HEIGHT,
-							   .width = CURRENT_WEATHER_WIDGET_WIDTH,
-							   .height = CURRENT_WEATHER_WIDGET_HEIGHT };
+	refresh_area = (EpdRect){ .x = 52, .y = 42, .width = 120, .height = 30 };
 
-	epd_err = epd_hl_update_area(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE, location_area);
+	epd_err = epd_hl_update_area(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE, refresh_area);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error updating screen. EPD error code: %d", epd_err);
+		epd_poweroff();
+		return 1;
+	}
+
+	refresh_area = (EpdRect){ .x = 15 + weather_icon_width / 2 + EPD_WIDTH / 2,
+							  .y = 0.15 * EPD_HEIGHT,
+							  .width = CURRENT_WEATHER_WIDGET_WIDTH,
+							  .height = CURRENT_WEATHER_WIDGET_HEIGHT };
+
+	epd_err = epd_hl_update_area(&hl, MODE_EPDIY_WHITE_TO_GL16, TEMPERATURE, refresh_area);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error updating screen. EPD error code: %d", epd_err);
 		epd_poweroff();
@@ -529,4 +566,3 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 
 	return 0;
 }
-// dow(m,d,y){y-=m<3;return(y+y/4-y/100+y/400+"-bed=pen+mad."[m]+d)%7;}

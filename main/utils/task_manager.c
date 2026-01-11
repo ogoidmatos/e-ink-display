@@ -19,6 +19,7 @@
 
 static EventGroupHandle_t ui_cycle_group;
 static location_t cached_location;
+static SemaphoreHandle_t http_mutex;
 
 static void location_task(void* args)
 {
@@ -116,6 +117,50 @@ void parse_weather_json(cJSON* json, current_weather_t* weather)
 		->valueint;
 }
 
+void parse_forecast_json(cJSON* json, forecast_weather_t* forecast_array, size_t array_size)
+{
+	// Parse JSON data for forecast
+	// today is day 0, tomorrow is day 1, day after tomorrow is day 2
+	cJSON* forecastDays = cJSON_GetObjectItem(json, "forecastDays");
+	for (size_t i = 0; i < array_size; i++) {
+		cJSON* day = cJSON_GetArrayItem(forecastDays, i);
+		forecast_array[i].date.year =
+		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "year")->valueint;
+		forecast_array[i].date.month =
+		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "month")->valueint;
+		forecast_array[i].date.day =
+		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "day")->valueint;
+
+		if (i == 0) {
+			continue; // skip today, we only want the date of today and the forecast for next days
+		}
+
+		forecast_array[i].max_temperature_c =
+		  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(day, "maxTemperature"), "degrees")
+			->valuedouble;
+		forecast_array[i].min_temperature_c =
+		  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(day, "minTemperature"), "degrees")
+			->valuedouble;
+
+		cJSON* daytimeForecast = cJSON_GetObjectItem(day, "daytimeForecast");
+		cJSON* weatherCondition = cJSON_GetObjectItem(daytimeForecast, "weatherCondition");
+		const char* desc =
+		  cJSON_GetObjectItem(cJSON_GetObjectItem(weatherCondition, "description"), "text")
+			->valuestring;
+		strncpy(forecast_array[i].description, desc, sizeof(forecast_array[i].description) - 1);
+
+		const char* code = cJSON_GetObjectItem(weatherCondition, "type")->valuestring;
+		strncpy(forecast_array[i].weather_code, code, sizeof(forecast_array[i].weather_code) - 1);
+
+		forecast_array[i].rain_chance =
+		  cJSON_GetObjectItem(
+			cJSON_GetObjectItem(cJSON_GetObjectItem(daytimeForecast, "precipitation"),
+								"probability"),
+			"percent")
+			->valueint;
+	}
+}
+
 static void current_weather_task(void* args)
 {
 	// wait on bits to receive location from ip api if location is dynamic
@@ -147,7 +192,9 @@ static void current_weather_task(void* args)
 			cached_location.latitude,
 			cached_location.longitude);
 
+	xSemaphoreTake(http_mutex, portMAX_DELAY);
 	uint8_t err = https_get_request(url, http_output_buffer);
+	xSemaphoreGive(http_mutex);
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error performing HTTPS GET request.");
 		free(http_output_buffer);
@@ -156,12 +203,14 @@ static void current_weather_task(void* args)
 
 	// write buffer into JSON object and free buffer
 	cJSON* json = cJSON_Parse(http_output_buffer);
-	free(http_output_buffer);
 
 	if (json == NULL) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error parsing JSON response.");
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Output buffer: %s", http_output_buffer);
+		free(http_output_buffer);
 		return;
 	}
+	free(http_output_buffer);
 
 	// Create and populate the weather struct
 	current_weather_t weather = { 0 };
@@ -201,7 +250,7 @@ static void refresh_task(void* args)
 		return;
 	}
 	xEventGroupWaitBits(ui_cycle_group,
-						LOCATION_DONE_BIT | CURRENT_WEATHER_DONE_BIT,
+						LOCATION_DONE_BIT | CURRENT_WEATHER_DONE_BIT | FORECAST_WEATHER_DONE_BIT,
 						pdTRUE, // clear bits
 						pdTRUE, // wait for all bits
 						portMAX_DELAY);
@@ -242,24 +291,36 @@ static void forecast_weather_task(void* args)
 			cached_location.latitude,
 			cached_location.longitude);
 
+	xSemaphoreTake(http_mutex, portMAX_DELAY);
 	uint8_t err = https_get_request(url, http_output_buffer);
+	xSemaphoreGive(http_mutex);
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error performing HTTPS GET request.");
 		free(http_output_buffer);
 		return;
 	}
-	// // write buffer into JSON object and free buffer
-	// cJSON* json = cJSON_Parse(http_output_buffer);
-	// free(http_output_buffer);
+	// write buffer into JSON object and free buffer
+	cJSON* json = cJSON_Parse(http_output_buffer);
 
-	// if (json == NULL) {
-	// 	ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error parsing JSON response.");
-	// 	return;
-	// }
-	// print the JSON response for debugging
-	ESP_LOGI(LOG_TAG_TASK_MANAGER, "Forecast JSON: %s", http_output_buffer);
+	if (json == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error parsing JSON response.");
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Output buffer: %s", http_output_buffer);
+		free(http_output_buffer);
+		return;
+	}
+	free(http_output_buffer);
 
-	// cJSON_Delete(json);
+	// Create and populate the forecast array
+	forecast_weather_t forecast_array[3] = { 0 };
+	parse_forecast_json(json, forecast_array, 3);
+
+	write_date_ui(
+	  forecast_array[0].date.year, forecast_array[0].date.month, forecast_array[0].date.day);
+
+	// signal forecast weather done
+	xEventGroupSetBits(ui_cycle_group, FORECAST_WEATHER_DONE_BIT);
+
+	cJSON_Delete(json);
 	vTaskDelete(NULL);
 }
 
@@ -293,6 +354,11 @@ uint8_t start_location_task()
 
 uint8_t start_weather_tasks()
 {
+	http_mutex = xSemaphoreCreateMutex();
+	if (http_mutex == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating HTTP mutex.");
+		return 1;
+	}
 	uint8_t err = xTaskCreate(current_weather_task, "current_weather_task", 4096, NULL, 5, NULL);
 	if (err != pdPASS) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating current weather task.");

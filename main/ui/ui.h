@@ -18,18 +18,33 @@
 #define FORECAST_WEATHER_WIDGET_HEIGHT 60
 
 typedef struct current_weather {
-    char description[32];
-    char weather_code[32];
     float temperature_c;
     float feels_like_temperature_c;
-    int humidity;
-    int uv_index;
     float max_temperature_c;
     float min_temperature_c;
-    int is_day_time;
-    int wind_speed_kph;
-    int rain_chance;
+    uint8_t wind_speed_kph;
+    uint8_t humidity;
+    uint8_t uv_index;
+    uint8_t rain_chance;
+    uint8_t is_day_time;
+    char weather_code[32];
+    char description[32];
 } current_weather_t;
+
+typedef struct date {
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+} date_t;
+
+typedef struct forecast_weather {
+    float max_temperature_c;
+    float min_temperature_c;
+    date_t date;
+    char weather_code[32];
+    char description[32];
+    uint8_t rain_chance;
+} forecast_weather_t;
 
 uint8_t init_ui();
 
@@ -42,5 +57,7 @@ uint8_t write_location_ui(const char* city, const char* country_code);
 uint8_t refresh_weather_tab_ui();
 
 uint8_t write_current_weather_ui(const current_weather_t* weather);
+
+uint8_t write_date_ui(uint16_t year, uint8_t month, uint8_t day);
 
 #endif // UI_H
