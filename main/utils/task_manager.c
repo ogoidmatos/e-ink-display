@@ -254,7 +254,7 @@ static void refresh_task(void* args)
 						pdTRUE, // clear bits
 						pdTRUE, // wait for all bits
 						portMAX_DELAY);
-	uint8_t err = refresh_weather_tab_ui();
+	uint8_t err = refresh_screen_ui();
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error refreshing weather tab UI.");
 	}
@@ -314,8 +314,17 @@ static void forecast_weather_task(void* args)
 	forecast_weather_t forecast_array[3] = { 0 };
 	parse_forecast_json(json, forecast_array, 3);
 
-	write_date_ui(
+	err = write_date_ui(
 	  forecast_array[0].date.year, forecast_array[0].date.month, forecast_array[0].date.day);
+
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing date to UI.");
+	}
+
+	err = write_forecast_ui(forecast_array);
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing forecast to UI.");
+	}
 
 	// signal forecast weather done
 	xEventGroupSetBits(ui_cycle_group, FORECAST_WEATHER_DONE_BIT);
