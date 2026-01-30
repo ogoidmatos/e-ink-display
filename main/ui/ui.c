@@ -245,6 +245,7 @@ uint8_t refresh_screen_ui()
 	}
 
 	epd_poweroff();
+	epd_deinit();
 	return 0;
 }
 

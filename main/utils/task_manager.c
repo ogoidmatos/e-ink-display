@@ -9,6 +9,7 @@
 #include "esp_log.h"
 
 // FreeRTOS includes
+#include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -258,6 +259,10 @@ static void refresh_task(void* args)
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error refreshing weather tab UI.");
 	}
+
+	// after updating the screen, send the device to deep sleep
+	disconnect_wifi();
+	esp_deep_sleep_start();
 	vTaskDelete(NULL);
 }
 

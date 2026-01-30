@@ -177,3 +177,11 @@ uint8_t https_get_request(const char* url, char* output_buffer)
 	esp_http_client_cleanup(client);
 	return err == ESP_OK ? 0 : 1;
 }
+
+void disconnect_wifi()
+{
+	ESP_ERROR_CHECK(esp_wifi_disconnect());
+	ESP_ERROR_CHECK(esp_wifi_stop());
+	ESP_ERROR_CHECK(esp_wifi_deinit());
+	ESP_LOGD(LOG_TAG_NETWORK, "Disconnected from WiFi.");
+}

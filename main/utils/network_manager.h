@@ -40,5 +40,6 @@ _Static_assert(strcmp(LONGITUDE, "0.0") != 0, "Dynamic location is disabled. Ple
 
 uint8_t connect_wifi();
 uint8_t https_get_request(const char* url, char* output_buffer);
+void disconnect_wifi();
 
 #endif // NETWORK_MANAGER_H

@@ -5,6 +5,7 @@
 // ESP includes
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_sleep.h"
 #include "nvs_flash.h"
 
 // Own includes
@@ -14,6 +15,9 @@
 #include "utils/task_manager.h"
 
 #define LOG_TAG_MAIN "MAIN"
+#define SECONDS_TO_MICROSECONDS 1000000
+#define HOURS_TO_SECONDS 3600
+#define SLEEP_TIME 6 * HOURS_TO_SECONDS* SECONDS_TO_MICROSECONDS // 6 hours
 
 void app_main(void)
 {
@@ -24,6 +28,13 @@ void app_main(void)
 		esp_err = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(esp_err);
+
+	// config sleep timer wake up
+	esp_err = esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_TIME);
+	if (esp_err != ESP_OK) {
+		ESP_LOGE(LOG_TAG_MAIN, "Error enabling timer wakeup for deep sleep.");
+		return;
+	}
 
 	// Connect to WiFi
 	uint8_t err = connect_wifi();
