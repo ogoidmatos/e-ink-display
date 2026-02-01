@@ -46,9 +46,9 @@ typedef struct forecast_weather {
     uint8_t rain_chance;
 } forecast_weather_t;
 
-uint8_t init_ui();
+uint8_t init_ui(float battery_percentage);
 
-uint8_t populate_base_ui();
+uint8_t populate_base_ui(float battery_percentage);
 
 uint8_t populate_weather_tab_ui();
 

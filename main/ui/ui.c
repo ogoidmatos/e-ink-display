@@ -18,6 +18,7 @@
 // Icon includes
 #include "icons/arrow_down.h"
 #include "icons/arrow_up.h"
+#include "icons/battery.h"
 #include "icons/calendar.h"
 #include "icons/weather_icons.h"
 #include "icons/weather_icons_large.h"
@@ -38,10 +39,11 @@ static const EpdFont* const font_9 = &SegoeVF_9;
 static EpdFontProperties header_font_props;
 static EpdFontProperties subtitle_font_props;
 
-uint8_t init_ui()
+static inline uint8_t day_of_the_week(uint8_t d, uint8_t m, uint16_t y);
+
+uint8_t init_ui(float battery_percentage)
 {
 	// setup
-	epd_init(EPD_OPTIONS_DEFAULT);
 	hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
 
 	fb = epd_hl_get_framebuffer(&hl);
@@ -63,7 +65,7 @@ uint8_t init_ui()
 	epd_poweroff();
 
 	// place on screen base elements
-	uint8_t err = populate_base_ui();
+	uint8_t err = populate_base_ui(battery_percentage);
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_UI, "Error populating base UI.");
 		return 1;
@@ -82,26 +84,23 @@ void draw_fancy_rect(EpdRect rect, uint8_t margin, uint8_t color, uint8_t* frame
 	  rect.x + rect.width - 1, rect.y + margin, rect.height - 2 * margin, color, framebuffer);
 }
 
-uint8_t populate_base_ui()
+uint8_t populate_base_ui(float battery_percentage)
 {
 	// write Today's meeting string
 	int cursor_x = 50;
 	int cursor_y = 32;
-	char meetings[] = "Today's Meetings";
 
 	enum EpdDrawError epd_err =
-	  epd_write_string(font_11, meetings, &cursor_x, &cursor_y, fb, &header_font_props);
+	  epd_write_string(font_11, "Today's Meetings", &cursor_x, &cursor_y, fb, &header_font_props);
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(LOG_TAG_UI, "Error writting meetings string. EPD error code: %d", epd_err);
 		return 1;
 	}
 
 	// draw calendar icon
-	EpdRect calendar_icon = {
-		.x = 15, .y = 13, .width = calendar_width, .height = calendar_height
-	};
+	EpdRect icon = { .x = 15, .y = 13, .width = calendar_width, .height = calendar_height };
 
-	epd_copy_to_framebuffer(calendar_icon, calendar_data, fb);
+	epd_copy_to_framebuffer(icon, calendar_data, fb);
 
 	// draw center line
 	epd_draw_vline(EPD_WIDTH / 2, 0, EPD_HEIGHT, MID_GRAY, fb);
@@ -110,6 +109,24 @@ uint8_t populate_base_ui()
 	uint8_t err = populate_weather_tab_ui();
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_UI, "Error populating weather tab UI.");
+		return 1;
+	}
+
+	// draw battery percentage
+	icon = (EpdRect){ .x = EPD_WIDTH - battery_width - 15,
+					  .y = 15,
+					  .width = battery_width,
+					  .height = battery_height };
+	epd_copy_to_framebuffer(icon, battery_data, fb);
+
+	cursor_x = icon.x - battery_width - 25;
+	cursor_y = 32;
+	char battery_str[16];
+	sprintf(battery_str, "%3.0f %%", battery_percentage);
+
+	epd_err = epd_write_string(font_9, battery_str, &cursor_x, &cursor_y, fb, &subtitle_font_props);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting battery string. EPD error code: %d", epd_err);
 		return 1;
 	}
 
@@ -193,7 +210,7 @@ uint8_t write_location_ui(const char* city, const char* country_code)
 	return 0;
 }
 
-uint8_t day_of_the_week(uint8_t d, uint8_t m, uint16_t y)
+static inline uint8_t day_of_the_week(uint8_t d, uint8_t m, uint16_t y)
 {
 	y -= m < 3;
 	return (y + y / 4 - y / 100 + y / 400 + "-bed=pen+mad."[m] + d) % 7;
