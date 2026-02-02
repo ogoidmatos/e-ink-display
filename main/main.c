@@ -21,6 +21,7 @@
 #include "utils/button.h"
 #include "utils/network_manager.h"
 #include "utils/task_manager.h"
+#include "utils/timezone_manager.h"
 
 #define LOG_TAG_MAIN "MAIN"
 #define SECONDS_TO_MICROSECONDS 1000000
@@ -38,11 +39,14 @@ void app_main(void)
 	ESP_ERROR_CHECK(esp_err);
 
 	// config sleep timer wake up
-	esp_err = esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_TIME);
+	esp_err = esp_sleep_enable_timer_wakeup((uint64_t)30 * SECONDS_TO_MICROSECONDS);
 	if (esp_err != ESP_OK) {
 		ESP_LOGE(LOG_TAG_MAIN, "Error enabling timer wakeup for deep sleep.");
 		return;
 	}
+
+	// init timezones hash map
+	zones_hash_init();
 
 	epd_init(EPD_OPTIONS_DEFAULT);
 
@@ -77,7 +81,7 @@ void app_main(void)
 		battery_percentage = ((battery_voltage - 3.0f) / (4.2f - 3.0f)) *
 							 100.0f; // assume battery voltage range 3.0V - 4.2V, needs validation
 	}
-	ESP_LOGW(LOG_TAG_MAIN,
+	ESP_LOGD(LOG_TAG_MAIN,
 			 "Battery voltage: %.2f V, Battery percentage: %.2f %% ",
 			 battery_voltage,
 			 battery_percentage);
