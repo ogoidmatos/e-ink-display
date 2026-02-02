@@ -451,21 +451,11 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 	}
 	next_icon_x = cursor_x + 20;
 
-	// sunrise - TODO: FINALIZE WITH DYNAMIC DATA
+	// sunrise icon, data is printed in forecast function
 	weather_icon.y = icon_y_high;
 	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(weather_icon, sunrise_data, fb);
 	xSemaphoreGive(fb_mutex);
-	sprintf(buffer, "10:10");
-	cursor_x = weather_icon.x + weather_icon.width + 5;
-	cursor_y = weather_icon.y + weather_icon.height - 5;
-	xSemaphoreTake(fb_mutex, portMAX_DELAY);
-	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
-	xSemaphoreGive(fb_mutex);
-	if (epd_err != EPD_DRAW_SUCCESS) {
-		ESP_LOGE(LOG_TAG_UI, "Error writting sunrise time. EPD error code: %d", epd_err);
-		return 1;
-	}
 
 	// UV index
 	weather_icon.x = next_icon_x;
@@ -484,21 +474,11 @@ uint8_t write_current_weather_ui(const current_weather_t* weather)
 		return 1;
 	}
 
-	// sunset - TODO: FINALIZE WITH DYNAMIC DATA
+	// sunset icon, data is printed in forecast function
 	weather_icon.y = icon_y_high;
 	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(weather_icon, sunset_data, fb);
 	xSemaphoreGive(fb_mutex);
-	sprintf(buffer, "19:00");
-	cursor_x = weather_icon.x + weather_icon.width + 5;
-	cursor_y = weather_icon.y + weather_icon.height - 5;
-	xSemaphoreTake(fb_mutex, portMAX_DELAY);
-	epd_err = epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &header_font_props);
-	xSemaphoreGive(fb_mutex);
-	if (epd_err != EPD_DRAW_SUCCESS) {
-		ESP_LOGE(LOG_TAG_UI, "Error writting sunset time. EPD error code: %d", epd_err);
-		return 1;
-	}
 
 	// draw main weather icon
 	weather_icon = (EpdRect){ .x = box_x + 0.7 * CURRENT_WEATHER_WIDGET_WIDTH,
@@ -716,6 +696,32 @@ uint8_t write_forecast_ui(const forecast_weather_t* forecast_array)
 	if (epd_err != EPD_DRAW_SUCCESS) {
 		ESP_LOGE(
 		  LOG_TAG_UI, "Error writting forecast 2 max/min temperature. EPD error code: %d", epd_err);
+		return 1;
+	}
+
+	// draw Sun events on current weather
+	// It is necessary to draw them here as the API endpoint that provides this info is the forecast
+	// endpoint Sunrise
+	cursor_x = 749;
+	cursor_y = 243;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
+	epd_err = epd_write_string(
+	  font_9, forecast_array[0].sunrise_time, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting sunrise time. EPD error code: %d", epd_err);
+		return 1;
+	}
+
+	// Sunset
+	cursor_x = 837;
+	cursor_y = 243;
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
+	epd_err = epd_write_string(
+	  font_9, forecast_array[0].sunset_time, &cursor_x, &cursor_y, fb, &header_font_props);
+	xSemaphoreGive(fb_mutex);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting sunset time. EPD error code: %d", epd_err);
 		return 1;
 	}
 

@@ -16,6 +16,7 @@
 // Own includes
 #include "network_manager.h"
 #include "task_manager.h"
+#include "timezone_manager.h"
 #include "ui/ui.h"
 
 static EventGroupHandle_t ui_cycle_group;
@@ -133,6 +134,15 @@ void parse_forecast_json(cJSON* json, forecast_weather_t* forecast_array, size_t
 		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "day")->valueint;
 
 		if (i == 0) {
+			char* time_buffer =
+			  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "sunEvents"), "sunriseTime")
+				->valuestring;
+			char* timezone =
+			  cJSON_GetObjectItem(cJSON_GetObjectItem(json, "timeZone"), "id")->valuestring;
+			convert_time_to_timezone(timezone, time_buffer, forecast_array[i].sunrise_time);
+			time_buffer =
+			  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "sunEvents"), "sunsetTime")->valuestring;
+			convert_time_to_timezone(timezone, time_buffer, forecast_array[i].sunset_time);
 			continue; // skip today, we only want the date of today and the forecast for next days
 		}
 
@@ -290,8 +300,8 @@ static void forecast_weather_task(void* args)
 	sprintf(url,
 			"https://weather.googleapis.com/v1/forecast/days:lookup"
 			"?key=%s&location.latitude=%f&location.longitude=%f&days=3&prettyPrint=false&fields="
-			"forecastDays(displayDate,maxTemperature,minTemperature,daytimeForecast("
-			"weatherCondition(description,type),precipitation(probability)))",
+			"timeZone,forecastDays(displayDate,maxTemperature,minTemperature,sunEvents,"
+			"daytimeForecast(weatherCondition(description,type),precipitation(probability)))",
 			WEATHER_API_KEY,
 			cached_location.latitude,
 			cached_location.longitude);

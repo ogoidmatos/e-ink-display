@@ -43,6 +43,8 @@ typedef struct forecast_weather {
     date_t date;
     char weather_code[32];
     char description[32];
+    char sunrise_time[6];
+    char sunset_time[6];
     uint8_t rain_chance;
 } forecast_weather_t;
 
