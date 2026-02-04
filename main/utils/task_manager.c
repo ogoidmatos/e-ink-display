@@ -150,13 +150,6 @@ void parse_forecast_json(cJSON* json, forecast_weather_t* forecast_array, size_t
 	cJSON* forecastDays = cJSON_GetObjectItem(json, "forecastDays");
 	for (size_t i = 0; i < array_size; i++) {
 		cJSON* day = cJSON_GetArrayItem(forecastDays, i);
-		forecast_array[i].date.year =
-		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "year")->valueint;
-		forecast_array[i].date.month =
-		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "month")->valueint;
-		forecast_array[i].date.day =
-		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "day")->valueint;
-
 		if (i == 0) {
 			char* time_buffer =
 			  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "sunEvents"), "sunriseTime")
@@ -167,8 +160,15 @@ void parse_forecast_json(cJSON* json, forecast_weather_t* forecast_array, size_t
 			time_buffer =
 			  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "sunEvents"), "sunsetTime")->valuestring;
 			convert_time_to_timezone(timezone, time_buffer, forecast_array[i].sunset_time);
-			continue; // skip today, we only want the date of today and the forecast for next days
+			continue; // skip today, we only want the sunrise/sunset times for today
 		}
+
+		forecast_array[i].date.year =
+		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "year")->valueint;
+		forecast_array[i].date.month =
+		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "month")->valueint;
+		forecast_array[i].date.day =
+		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "day")->valueint;
 
 		forecast_array[i].max_temperature_c =
 		  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(day, "maxTemperature"), "degrees")
@@ -223,7 +223,7 @@ static void current_weather_task(void* args)
 			"weatherCondition(description,type),temperature,feelsLikeTemperature,relativeHumidity,"
 			"uvIndex,precipitation(probability),wind(speed),currentConditionsHistory("
 			"maxTemperature,minTemperature)",
-			WEATHER_API_KEY,
+			GOOGLE_API_KEY,
 			cached_location.latitude,
 			cached_location.longitude);
 
@@ -326,7 +326,7 @@ static void forecast_weather_task(void* args)
 			"?key=%s&location.latitude=%f&location.longitude=%f&days=3&prettyPrint=false&fields="
 			"timeZone,forecastDays(displayDate,maxTemperature,minTemperature,sunEvents,"
 			"daytimeForecast(weatherCondition(description,type),precipitation(probability)))",
-			WEATHER_API_KEY,
+			GOOGLE_API_KEY,
 			cached_location.latitude,
 			cached_location.longitude);
 
@@ -353,13 +353,6 @@ static void forecast_weather_task(void* args)
 	forecast_weather_t forecast_array[3] = { 0 };
 	parse_forecast_json(json, forecast_array, 3);
 
-	err = write_date_ui(
-	  forecast_array[0].date.year, forecast_array[0].date.month, forecast_array[0].date.day);
-
-	if (err != 0) {
-		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing date to UI.");
-	}
-
 	err = write_forecast_ui(forecast_array);
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing forecast to UI.");
@@ -369,6 +362,37 @@ static void forecast_weather_task(void* args)
 	xEventGroupSetBits(ui_cycle_group, FORECAST_WEATHER_DONE_BIT);
 
 	cJSON_Delete(json);
+	vTaskDelete(NULL);
+}
+
+static void calendar_task(void* args)
+{
+	char* http_output_buffer = calloc(MAX_HTTP_OUTPUT_BUFFER, sizeof(char));
+	if (http_output_buffer == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error allocating memory for HTTP output buffer.");
+		free(http_output_buffer);
+		return;
+	}
+
+	char url[360];
+	sprintf(url,
+			"https://googleapis.com/calendar/v3/calendars/%s/"
+			"events?timeMin=2026-01-22T00:00:00Z&timeMax=2026-01-22T23:59:00Z&fields=items(summary,"
+			"start,end)&key=%s",
+			CALENDAR_TARGET,
+			GOOGLE_API_KEY);
+
+	xSemaphoreTake(http_mutex, portMAX_DELAY);
+	uint8_t err = https_get_request(url, http_output_buffer);
+	xSemaphoreGive(http_mutex);
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error performing HTTPS GET request.");
+		free(http_output_buffer);
+		return;
+	}
+	// write buffer into JSON object and free buffer
+	cJSON* json = cJSON_Parse(http_output_buffer);
+
 	vTaskDelete(NULL);
 }
 

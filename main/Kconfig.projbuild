@@ -12,9 +12,9 @@ menu "WiFi Configuration"
             The password for the WiFi network.
 endmenu
 
-menu "Weather API Configuration"
-    config WEATHER_API_KEY
-        string "Weather API Key"
+menu "API Configuration"
+    config GOOGLE_API_KEY
+        string "Google API Key"
         default "your-api-key"
         help
             The API key for accessing the Google Maps Weather API.
@@ -36,4 +36,10 @@ menu "Weather API Configuration"
         default "0.0"
         help
             The longitude of the location for which to fetch weather data.
+
+    config CALENDAR
+        string "Calendar ID"
+        default "primary"
+        help
+            The calendar ID for which to fetch events. Use "primary" for the primary calendar of the authenticated user.
 endmenu

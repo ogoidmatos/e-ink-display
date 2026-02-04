@@ -18,8 +18,11 @@ typedef struct location {
 #define CURRENT_WEATHER_DONE_BIT (1 << 1)
 #define FORECAST_WEATHER_DONE_BIT (1 << 2)
 
+#define CALENDAR_TARGET CONFIG_CALENDAR
+
 uint8_t start_location_task();
 uint8_t start_weather_tasks();
 uint8_t start_refresh_task();
+uint8_t start_calendar_task();
 
 #endif // TASK_MANAGER_H
