@@ -15,7 +15,7 @@ _Static_assert(strcmp(WIFI_SSID, "your-ssid") != 0, "Please configure WiFi crede
 _Static_assert(strcmp(WIFI_PASSWORD, "your-password") != 0, "Please configure WiFi credentials in menuconfig");
 
 // API configuration
-#define WEATHER_API_KEY CONFIG_WEATHER_API_KEY
+#define GOOGLE_API_KEY CONFIG_GOOGLE_API_KEY
 
 #if !defined (CONFIG_USE_DYNAMIC_LOCATION) || (CONFIG_USE_DYNAMIC_LOCATION == 0)
 
@@ -40,6 +40,7 @@ _Static_assert(strcmp(LONGITUDE, "0.0") != 0, "Dynamic location is disabled. Ple
 
 uint8_t connect_wifi();
 uint8_t https_get_request(const char* url, char* output_buffer);
+uint8_t sync_clock_with_sntp();
 void disconnect_wifi();
 
 #endif // NETWORK_MANAGER_H

@@ -21,6 +21,8 @@
 
 static EventGroupHandle_t ui_cycle_group;
 static location_t cached_location;
+static struct tm current_time;
+static char current_timezone[32];
 static SemaphoreHandle_t http_mutex;
 
 static void location_task(void* args)
@@ -67,6 +69,28 @@ static void location_task(void* args)
 	err = write_location_ui(city, country_code);
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing location to UI.");
+	}
+
+	strcpy(current_timezone, cJSON_GetObjectItem(json, "timezone")->valuestring);
+
+	// use the local timezone given by the ip api to convert current time to local time
+	convert_time_to_local(current_timezone, time(NULL), &current_time);
+
+	// write date to UI
+	err = write_date_ui(current_time.tm_year + 1900, current_time.tm_mon, current_time.tm_mday);
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing date to UI.");
+	}
+
+	// format time to HH:MM string and then print it to UI
+	char time_string[16];
+	err = tm_to_hour_min(&current_time, time_string);
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error converting time to string.");
+	}
+	err = write_last_updated_ui(time_string);
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing last updated to UI.");
 	}
 
 	// signal location done

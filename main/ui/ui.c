@@ -232,7 +232,7 @@ uint8_t write_date_ui(uint16_t year, uint8_t month, uint8_t day)
 			"%s, %02d %s %04d",
 			day_str[day_of_the_week(day, month, year)],
 			day,
-			month_str[month - 1],
+			month_str[month],
 			year);
 
 	ESP_LOGD(LOG_TAG_UI, "%s", date);
@@ -725,5 +725,24 @@ uint8_t write_forecast_ui(const forecast_weather_t* forecast_array)
 		return 1;
 	}
 
+	return 0;
+}
+
+uint8_t write_last_updated_ui(const char* time_string)
+{
+	// write last updated
+	int cursor_x = 15;
+	int cursor_y = EPD_HEIGHT - 15;
+
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
+	char buffer[64];
+	sprintf(buffer, "Last updated: %s", time_string);
+	enum EpdDrawError epd_err =
+	  epd_write_string(font_9, buffer, &cursor_x, &cursor_y, fb, &subtitle_font_props);
+	xSemaphoreGive(fb_mutex);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting last updated string. EPD error code: %d", epd_err);
+		return 1;
+	}
 	return 0;
 }

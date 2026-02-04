@@ -64,4 +64,6 @@ uint8_t write_date_ui(uint16_t year, uint8_t month, uint8_t day);
 
 uint8_t write_forecast_ui(const forecast_weather_t* forecast_array);
 
+uint8_t write_last_updated_ui(const char* time_string);
+
 #endif // UI_H

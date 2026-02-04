@@ -95,6 +95,13 @@ void app_main(void)
 		return;
 	}
 
+	// Sync clock with SNTP server, to get world clock time
+	err = sync_clock_with_sntp();
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_MAIN, "Error syncing clock with SNTP.");
+		return;
+	}
+
 	// button_switch_context_init();
 
 	// setup UI

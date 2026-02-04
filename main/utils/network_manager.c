@@ -3,6 +3,7 @@
 #include "esp_event.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
+#include "esp_netif_sntp.h"
 #include "esp_wifi.h"
 
 // Own includes
@@ -152,6 +153,20 @@ uint8_t connect_wifi()
 		ESP_LOGE(LOG_TAG_NETWORK, "Unexpected behaviour connecting to the wifi.");
 		return 1;
 	}
+}
+
+uint8_t sync_clock_with_sntp()
+{
+	esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+	esp_err_t err = esp_netif_sntp_init(&config);
+	if (err != ESP_OK) {
+		ESP_LOGE(LOG_TAG_NETWORK, "Failed to initialize SNTP: %s", esp_err_to_name(err));
+		return 1;
+	} else if (esp_netif_sntp_sync_wait(pdMS_TO_TICKS(10000)) != ESP_OK) {
+		ESP_LOGE(LOG_TAG_NETWORK, "Failed to update system time within 10s timeout.");
+		return 1;
+	}
+	return 0;
 }
 
 uint8_t https_get_request(const char* url, char* output_buffer)

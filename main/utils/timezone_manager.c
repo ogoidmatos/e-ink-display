@@ -2,9 +2,6 @@
 #include "timezone_manager.h"
 #include <search.h>
 
-#include <sys/time.h>
-#include <sys/unistd.h>
-
 void zones_hash_init(void)
 {
 	hcreate(ZONE_TABLE_SIZE);
@@ -52,5 +49,35 @@ uint8_t convert_time_to_timezone(const char* zone_name,
 
 	// Format the converted time back to string
 	strftime(output_time_string, 6, "%H:%M", local_time);
+	return 0;
+}
+
+uint8_t convert_time_to_local(const char* zone_name, time_t time, struct tm* output_local_time)
+{
+	const char* tz_string = find_tz_by_zone(zone_name);
+	if (!tz_string) {
+		return 1; // Time zone not found
+	}
+
+	// Set the TZ environment variable to the desired time zone
+	if (setenv("TZ", tz_string, 1) != 0) {
+		return 1; // Failed to set environment variable
+	}
+	tzset();
+
+	struct tm* local_time = localtime(&time);
+	if (!local_time) {
+		return 1; // Failed to convert time
+	}
+
+	*output_local_time = *local_time;
+	return 0;
+}
+
+uint8_t tm_to_hour_min(const struct tm* timeinfo, char* output_time_string)
+{
+	if (strftime(output_time_string, 6, "%H:%M", timeinfo) == 0) {
+		return 1; // Failed to format time
+	}
 	return 0;
 }
