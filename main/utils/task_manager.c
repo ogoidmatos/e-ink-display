@@ -41,7 +41,7 @@ static void location_task(void* args)
 		return;
 	}
 
-	uint8_t err = https_get_request("http://ip-api.com/json", http_output_buffer);
+	uint8_t err = https_get_request("http://ip-api.com/json", http_output_buffer, NULL);
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error performing HTTPS GET request.");
 		free(http_output_buffer);
@@ -135,7 +135,7 @@ static void current_weather_task(void* args)
 			cached_location.longitude);
 
 	xSemaphoreTake(http_mutex, portMAX_DELAY);
-	uint8_t err = https_get_request(url, http_output_buffer);
+	uint8_t err = https_get_request(url, http_output_buffer, NULL);
 	xSemaphoreGive(http_mutex);
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error performing HTTPS GET request.");
@@ -239,7 +239,7 @@ static void forecast_weather_task(void* args)
 			cached_location.longitude);
 
 	xSemaphoreTake(http_mutex, portMAX_DELAY);
-	uint8_t err = https_get_request(url, http_output_buffer);
+	uint8_t err = https_get_request(url, http_output_buffer, NULL);
 	xSemaphoreGive(http_mutex);
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error performing HTTPS GET request.");
@@ -308,25 +308,48 @@ static void calendar_task(void* args)
 	memset(private_key, 0, required_size);
 	free(private_key);
 
-	ESP_LOGE(LOG_TAG_TASK_MANAGER, "JWT: %s", jwt);
+	ESP_LOGD(LOG_TAG_TASK_MANAGER, "JWT: %s", jwt);
 
-	char url[256];
+	xSemaphoreTake(http_mutex, portMAX_DELAY);
+	uint8_t err =
+	  https_gcp_auth_post_request("https://oauth2.googleapis.com/token", jwt, http_output_buffer);
+	xSemaphoreGive(http_mutex);
+	free(jwt);
+
+	cJSON* token_json = cJSON_Parse(http_output_buffer);
+	if (token_json == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error parsing JSON response.");
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Output buffer: %s", http_output_buffer);
+		free(http_output_buffer);
+		return;
+	}
+	const char* bearer_token = cJSON_GetObjectItem(token_json, "access_token")->valuestring;
+	if (bearer_token == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error getting bearer token from JSON response.");
+		free(http_output_buffer);
+		cJSON_Delete(token_json);
+		return;
+	}
+
+	char url[252];
 	char date_buffer[12];
 	strftime(date_buffer, 12, "%Y-%m-%d", &current_time);
 	sprintf(url,
 			"https://content.googleapis.com/calendar/v3/calendars/%s/events?"
 			"singleEvents=true&timeMin=%sT00:00:00Z&timeMax=%sT23:59:00Z&orderBy=startTime&"
-			"fields=items(summary,start,end)&key=%s",
+			"fields=items(summary,start,end)",
 			CALENDAR_TARGET,
 			date_buffer,
-			date_buffer,
-			GOOGLE_API_KEY);
+			date_buffer);
 
-	ESP_LOGI(LOG_TAG_TASK_MANAGER, "%s", url);
+	ESP_LOGD(LOG_TAG_TASK_MANAGER, "%s", url);
 
 	xSemaphoreTake(http_mutex, portMAX_DELAY);
-	uint8_t err = https_get_request(url, http_output_buffer);
+	err = https_get_request(url, http_output_buffer, bearer_token);
 	xSemaphoreGive(http_mutex);
+
+	cJSON_Delete(token_json);
+
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error performing HTTPS GET request.");
 		free(http_output_buffer);
@@ -341,7 +364,7 @@ static void calendar_task(void* args)
 		return;
 	}
 
-	calendar_event_t* events = NULL;
+	calendar_event_t events[MAX_CALENDAR_EVENTS] = { 0 };
 	int num_events = parse_events_json(json, events);
 	cJSON_Delete(json);
 
@@ -359,7 +382,7 @@ static void calendar_task(void* args)
 		// no events, get random fact of the day and write to UI
 		strcpy(url, "https://uselessfacts.jsph.pl/random.json");
 		xSemaphoreTake(http_mutex, portMAX_DELAY);
-		uint8_t err = https_get_request(url, http_output_buffer);
+		uint8_t err = https_get_request(url, http_output_buffer, NULL);
 		xSemaphoreGive(http_mutex);
 		if (err != 0) {
 			ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error performing HTTPS GET request.");
@@ -385,7 +408,6 @@ static void calendar_task(void* args)
 	xEventGroupSetBits(ui_cycle_group, EVENTS_DONE_BIT);
 
 	free(http_output_buffer);
-	free(events);
 
 	vTaskDelete(NULL);
 }

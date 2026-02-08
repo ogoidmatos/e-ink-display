@@ -813,9 +813,11 @@ uint8_t write_fact_ui(const char* fact)
 uint8_t write_calendar_events_ui(const calendar_event_t* events, int event_count)
 {
 
-	EpdRect event_rect = { .x = 15, .y = 80, .width = EPD_WIDTH / 2 - 30, .height = 40 };
+	EpdRect event_rect = {
+		.x = 15 + calendar_width / 2, .y = 80, .width = EPD_WIDTH / 2 - 55, .height = 80
+	};
 	EpdRect clock_icon = {
-		.x = event_rect.x + 10, .y = event_rect.y + 10, .width = clock_width, .height = clock_height
+		.x = event_rect.x + 15, .y = event_rect.y + 12, .width = clock_width, .height = clock_height
 	};
 	int cursor_x;
 	int cursor_y;
@@ -832,12 +834,12 @@ uint8_t write_calendar_events_ui(const calendar_event_t* events, int event_count
 		xSemaphoreGive(fb_mutex);
 
 		// write event start hour
-		cursor_x = clock_icon.x + clock_icon.width + 5;
-		cursor_y = clock_icon.y + clock_icon.height - 5;
+		cursor_x = clock_icon.x + clock_icon.width + 10;
+		cursor_y = clock_icon.y + clock_icon.height - 3;
 		if (events[i].is_all_day) {
 			xSemaphoreTake(fb_mutex, portMAX_DELAY);
 			epd_err =
-			  epd_write_string(font_9, "All Day", &cursor_x, &cursor_y, fb, &header_font_props);
+			  epd_write_string(font_11, "All Day", &cursor_x, &cursor_y, fb, &header_font_props);
 			xSemaphoreGive(fb_mutex);
 			if (epd_err != EPD_DRAW_SUCCESS) {
 				ESP_LOGE(LOG_TAG_UI, "Error writting all day string. EPD error code: %d", epd_err);
@@ -846,7 +848,7 @@ uint8_t write_calendar_events_ui(const calendar_event_t* events, int event_count
 		} else {
 			xSemaphoreTake(fb_mutex, portMAX_DELAY);
 			epd_err = epd_write_string(
-			  font_9, events[i].start_time, &cursor_x, &cursor_y, fb, &header_font_props);
+			  font_11, events[i].start_time, &cursor_x, &cursor_y, fb, &header_font_props);
 			xSemaphoreGive(fb_mutex);
 			if (epd_err != EPD_DRAW_SUCCESS) {
 				ESP_LOGE(
@@ -855,15 +857,58 @@ uint8_t write_calendar_events_ui(const calendar_event_t* events, int event_count
 			}
 		}
 
+		// write duration if event is not all day
+		if (!events[i].is_all_day) {
+			cursor_x = event_rect.x + event_rect.width - 15;
+			cursor_y = clock_icon.y + clock_icon.height - 3;
+			EpdFontProperties duration_font_props = subtitle_font_props;
+			duration_font_props.flags = EPD_DRAW_ALIGN_RIGHT;
+			xSemaphoreTake(fb_mutex, portMAX_DELAY);
+			epd_err = epd_write_string(
+			  font_9, events[i].duration, &cursor_x, &cursor_y, fb, &duration_font_props);
+			xSemaphoreGive(fb_mutex);
+			if (epd_err != EPD_DRAW_SUCCESS) {
+				ESP_LOGE(LOG_TAG_UI, "Error writting event duration. EPD error code: %d", epd_err);
+				return 1;
+			}
+		}
+
 		// write event title
-		cursor_x = event_rect.x + 10;
-		cursor_y = event_rect.y + event_rect.height - 5;
+		cursor_x = clock_icon.x + clock_icon.width / 3;
+		cursor_y = event_rect.y + event_rect.height - 12;
 		xSemaphoreTake(fb_mutex, portMAX_DELAY);
 		epd_err = epd_write_string(
 		  font_11, events[i].summary, &cursor_x, &cursor_y, fb, &header_font_props);
 		xSemaphoreGive(fb_mutex);
 		if (epd_err != EPD_DRAW_SUCCESS) {
 			ESP_LOGE(LOG_TAG_UI, "Error writting event title. EPD error code: %d", epd_err);
+			return 1;
+		}
+
+		clock_icon.y += event_rect.height + 20;
+		event_rect.y += event_rect.height + 20;
+	}
+
+	// if there are still more events, write the number of remaining events
+	if (event_count > MAX_CALENDAR_EVENTS) {
+		char buffer[64];
+		if (event_count - MAX_CALENDAR_EVENTS == 1) {
+			sprintf(buffer, "You still have 1 more event today.");
+		} else {
+			sprintf(
+			  buffer, "You still have %d more events today.", event_count - MAX_CALENDAR_EVENTS);
+		}
+		cursor_x = EPD_WIDTH / 4;
+		cursor_y = event_rect.y + 15;
+		EpdFontProperties remaining_events_font_props = subtitle_font_props;
+		remaining_events_font_props.flags = EPD_DRAW_ALIGN_CENTER;
+		xSemaphoreTake(fb_mutex, portMAX_DELAY);
+		enum EpdDrawError epd_err =
+		  epd_write_string(font_11, buffer, &cursor_x, &cursor_y, fb, &remaining_events_font_props);
+		xSemaphoreGive(fb_mutex);
+		if (epd_err != EPD_DRAW_SUCCESS) {
+			ESP_LOGE(
+			  LOG_TAG_UI, "Error writting remaining events string. EPD error code: %d", epd_err);
 			return 1;
 		}
 	}

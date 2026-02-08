@@ -18,7 +18,7 @@
 #define FORECAST_WEATHER_WIDGET_WIDTH 400
 #define FORECAST_WEATHER_WIDGET_HEIGHT 60
 
-#define MAX_CALENDAR_EVENTS 5
+#define MAX_CALENDAR_EVENTS 4
 
 typedef struct current_weather {
     float temperature_c;
@@ -52,7 +52,7 @@ typedef struct forecast_weather {
 } forecast_weather_t;
 
 typedef struct calendar_event {
-    char summary[64];
+    char summary[42];
     char duration[32];
     char start_time[6];
     bool is_all_day;

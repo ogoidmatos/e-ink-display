@@ -114,17 +114,18 @@ int parse_events_json(cJSON* json, calendar_event_t* events)
 	if (length == 0) {
 		return 0; // no events today
 	}
-	events = calloc(length, sizeof(calendar_event_t));
-	if (events == NULL) {
-		ESP_LOGE(LOG_TAG_JSON_PARSER, "Error allocating memory for calendar events.");
-		return -1;
-	}
 
 	for (int i = 0; i < length && i < MAX_CALENDAR_EVENTS; i++) {
 		cJSON* item = cJSON_GetArrayItem(items, i);
 
 		const char* summary = cJSON_GetObjectItem(item, "summary")->valuestring;
-		strncpy(events[i].summary, summary, sizeof(events[i].summary) - 1);
+		strlcpy(events[i].summary, summary, sizeof(events[i].summary) - 1);
+		if (strlen(summary) > 40) {
+			events[i].summary[38] = '.';
+			events[i].summary[39] = '.';
+			events[i].summary[40] = '.';
+			events[i].summary[41] = '\0';
+		}
 
 		cJSON* start = cJSON_GetObjectItem(item, "start");
 		cJSON* date_time = cJSON_GetObjectItem(start, "dateTime");

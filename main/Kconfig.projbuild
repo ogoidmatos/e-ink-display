@@ -49,5 +49,5 @@ menu "E-Paper Display App Configuration"
         string "Calendar ID"
         default "primary"
         help
-            The calendar ID for which to fetch events. Use "primary" for the primary calendar of the authenticated user.
+            The calendar ID for which to fetch events. Use "primary" for the primary calendar of the authenticated user. Primary calendar might not work with service accounts.
 endmenu
