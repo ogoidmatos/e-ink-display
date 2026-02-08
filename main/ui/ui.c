@@ -582,7 +582,7 @@ uint8_t write_forecast_ui(const forecast_weather_t* forecast_array)
 	}
 
 	// draw rain change for first forecast
-	weather_icon.x = forecast_x + 0.6 * FORECAST_WEATHER_WIDGET_WIDTH;
+	weather_icon.x = forecast_x + 0.58 * FORECAST_WEATHER_WIDGET_WIDTH;
 	weather_icon.y = first_forecast_y + 0.3 * FORECAST_WEATHER_WIDGET_HEIGHT;
 	xSemaphoreTake(fb_mutex, portMAX_DELAY);
 	epd_copy_to_framebuffer(weather_icon, dimmed_rain_icon, fb);
@@ -664,7 +664,7 @@ uint8_t write_forecast_ui(const forecast_weather_t* forecast_array)
 	}
 
 	// draw rain change for second forecast
-	weather_icon.x = forecast_x + 0.6 * FORECAST_WEATHER_WIDGET_WIDTH;
+	weather_icon.x = forecast_x + 0.58 * FORECAST_WEATHER_WIDGET_WIDTH;
 	weather_icon.y = second_forecast_y + 0.3 * FORECAST_WEATHER_WIDGET_HEIGHT;
 
 	xSemaphoreTake(fb_mutex, portMAX_DELAY);
