@@ -20,6 +20,7 @@
 #include "icons/arrow_up.h"
 #include "icons/battery.h"
 #include "icons/calendar.h"
+#include "icons/clock.h"
 #include "icons/weather_icons.h"
 #include "icons/weather_icons_large.h"
 
@@ -266,7 +267,7 @@ uint8_t refresh_screen_ui()
 	return 0;
 }
 
-const uint8_t* process_weather_icon(const char* weather_code, const int is_day_time, bool is_large)
+const uint8_t* process_weather_icon(const char* weather_code, const bool is_day_time, bool is_large)
 {
 	if (strcmp(weather_code, "CLEAR") == 0) {
 		if (is_day_time) {
@@ -744,5 +745,128 @@ uint8_t write_last_updated_ui(const char* time_string)
 		ESP_LOGE(LOG_TAG_UI, "Error writting last updated string. EPD error code: %d", epd_err);
 		return 1;
 	}
+	return 0;
+}
+
+uint8_t write_fact_ui(const char* fact)
+{
+	// write random fact of the day
+	int cursor_x = EPD_WIDTH / 16;
+	int cursor_y = EPD_HEIGHT / 3;
+	char buffer[512] = "You don't have any events for today.\nHere is a random fact instead:\n\n";
+
+	int len = strlen(fact);
+	if (len > 30) {
+		int pos = 0;
+		int line_count = 0;
+		const int max_line_length = 35;
+		const int max_lines = 8;
+
+		while (pos < len && line_count < max_lines) {
+			int remaining = len - pos;
+			int chunk_size = remaining > max_line_length ? max_line_length : remaining;
+
+			// Find the last space within the chunk to avoid breaking words
+			if (remaining > max_line_length) {
+				int break_pos = chunk_size;
+				while (break_pos > 0 && fact[pos + break_pos] != ' ') {
+					break_pos--;
+				}
+				// If no space found (word longer than max_line_length), break at max length
+				if (break_pos > 0) {
+					chunk_size = break_pos;
+				}
+			}
+			strncat(buffer, fact + pos, chunk_size);
+			pos += chunk_size;
+
+			// Skip any leading spaces for the next line
+			while (pos < len && fact[pos] == ' ') {
+				pos++;
+			}
+			line_count++;
+
+			// Add newline if there's more content
+			if (pos < len) {
+				strcat(buffer, "\n");
+			}
+		}
+
+		// Add ellipsis if there's remaining text that won't fit
+		if (pos < len) {
+			strcat(buffer, "...");
+		}
+	} else {
+		strcat(buffer, fact);
+	}
+
+	xSemaphoreTake(fb_mutex, portMAX_DELAY);
+	enum EpdDrawError epd_err = epd_write_default(font_11, buffer, &cursor_x, &cursor_y, fb);
+	xSemaphoreGive(fb_mutex);
+	if (epd_err != EPD_DRAW_SUCCESS) {
+		ESP_LOGE(LOG_TAG_UI, "Error writting fact string. EPD error code: %d", epd_err);
+		return 1;
+	}
+	return 0;
+}
+
+uint8_t write_calendar_events_ui(const calendar_event_t* events, int event_count)
+{
+
+	EpdRect event_rect = { .x = 15, .y = 80, .width = EPD_WIDTH / 2 - 30, .height = 40 };
+	EpdRect clock_icon = {
+		.x = event_rect.x + 10, .y = event_rect.y + 10, .width = clock_width, .height = clock_height
+	};
+	int cursor_x;
+	int cursor_y;
+	enum EpdDrawError epd_err;
+	for (int i = 0; i < event_count && i < MAX_CALENDAR_EVENTS; i++) {
+		// draw base box
+		xSemaphoreTake(fb_mutex, portMAX_DELAY);
+		draw_fancy_rect(event_rect, 10, BLACK, fb);
+		xSemaphoreGive(fb_mutex);
+
+		// draw clock icon for start hour
+		xSemaphoreTake(fb_mutex, portMAX_DELAY);
+		epd_copy_to_framebuffer(clock_icon, clock_data, fb);
+		xSemaphoreGive(fb_mutex);
+
+		// write event start hour
+		cursor_x = clock_icon.x + clock_icon.width + 5;
+		cursor_y = clock_icon.y + clock_icon.height - 5;
+		if (events[i].is_all_day) {
+			xSemaphoreTake(fb_mutex, portMAX_DELAY);
+			epd_err =
+			  epd_write_string(font_9, "All Day", &cursor_x, &cursor_y, fb, &header_font_props);
+			xSemaphoreGive(fb_mutex);
+			if (epd_err != EPD_DRAW_SUCCESS) {
+				ESP_LOGE(LOG_TAG_UI, "Error writting all day string. EPD error code: %d", epd_err);
+				return 1;
+			}
+		} else {
+			xSemaphoreTake(fb_mutex, portMAX_DELAY);
+			epd_err = epd_write_string(
+			  font_9, events[i].start_time, &cursor_x, &cursor_y, fb, &header_font_props);
+			xSemaphoreGive(fb_mutex);
+			if (epd_err != EPD_DRAW_SUCCESS) {
+				ESP_LOGE(
+				  LOG_TAG_UI, "Error writting event start time. EPD error code: %d", epd_err);
+				return 1;
+			}
+		}
+
+		// write event title
+		cursor_x = event_rect.x + 10;
+		cursor_y = event_rect.y + event_rect.height - 5;
+		xSemaphoreTake(fb_mutex, portMAX_DELAY);
+		epd_err = epd_write_string(
+		  font_11, events[i].summary, &cursor_x, &cursor_y, fb, &header_font_props);
+		xSemaphoreGive(fb_mutex);
+		if (epd_err != EPD_DRAW_SUCCESS) {
+			ESP_LOGE(LOG_TAG_UI, "Error writting event title. EPD error code: %d", epd_err);
+			return 1;
+		}
+	}
+
 	return 0;
 }
