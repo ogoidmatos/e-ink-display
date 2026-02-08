@@ -40,7 +40,8 @@ _Static_assert(strcmp(LONGITUDE, "0.0") != 0, "Dynamic location is disabled. Ple
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 uint8_t connect_wifi();
-uint8_t https_get_request(const char* url, char* output_buffer);
+uint8_t https_get_request(const char* url, char* output_buffer, const char* bearer_token);
+uint8_t https_gcp_auth_post_request(const char* url, const char* jwt, char* output_buffer);
 uint8_t sync_clock_with_sntp();
 void disconnect_wifi();
 

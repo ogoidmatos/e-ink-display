@@ -5,5 +5,4 @@
 
 char* createGCPJWT(const char* email, uint8_t* privateKey, size_t privateKeySize);
 
-
 #endif /* JWT_MANAGER_H */

@@ -169,15 +169,33 @@ uint8_t sync_clock_with_sntp()
 	return 0;
 }
 
-uint8_t https_get_request(const char* url, char* output_buffer)
+uint8_t https_get_request(const char* url, char* output_buffer, const char* bearer_token)
 {
 	esp_http_client_config_t config = {
 		.url = url,
 		.event_handler = http_event_handler,
 		.user_data = output_buffer, // Pass the buffer to get response
 		.skip_cert_common_name_check = true,
+		.buffer_size_tx = 2048,
 	};
+
 	esp_http_client_handle_t client = esp_http_client_init(&config);
+
+	if (bearer_token != NULL) {
+		char* auth_header = calloc(1100, sizeof(char)); // bearer token can be up to 1024 chars,
+														// plus "Bearer " prefix and null terminator
+		sprintf(auth_header, "Bearer %s", bearer_token);
+		ESP_LOGD(LOG_TAG_HTTP, "Setting Authorization header: %s", auth_header);
+
+		esp_err_t err = esp_http_client_set_header(client, "Authorization", auth_header);
+		if (err != ESP_OK) {
+			ESP_LOGE(LOG_TAG_HTTP, "Failed to set HTTP header: %s", esp_err_to_name(err));
+			esp_http_client_cleanup(client);
+			free(auth_header);
+			return 1;
+		}
+		free(auth_header);
+	}
 
 	esp_err_t err = esp_http_client_perform(client);
 	if (err == ESP_OK) {
@@ -191,6 +209,59 @@ uint8_t https_get_request(const char* url, char* output_buffer)
 
 	esp_http_client_cleanup(client);
 	return err == ESP_OK ? 0 : 1;
+}
+
+uint8_t https_gcp_auth_post_request(const char* url, const char* jwt, char* output_buffer)
+{
+	// This function is used to get the bearer token from GCP using OAuth2.0 with JWT.
+	// It follows the process described here:
+	// https://developers.google.com/identity/protocols/oauth2/service-account#httprest
+	esp_http_client_config_t config = {
+		.url = url,
+		.event_handler = http_event_handler,
+		.user_data = output_buffer, // Pass the buffer to get response
+		.skip_cert_common_name_check = true,
+	};
+	esp_http_client_handle_t client = esp_http_client_init(&config);
+
+	// Set https request to POST
+	esp_err_t err = esp_http_client_set_method(client, HTTP_METHOD_POST);
+	if (err != ESP_OK) {
+		ESP_LOGE(LOG_TAG_HTTP, "Failed to set HTTP method: %s", esp_err_to_name(err));
+		esp_http_client_cleanup(client);
+		return 1;
+	}
+
+	// Set content type header to url encoded
+	err = esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
+	if (err != ESP_OK) {
+		ESP_LOGE(LOG_TAG_HTTP, "Failed to set HTTP header: %s", esp_err_to_name(err));
+		esp_http_client_cleanup(client);
+		return 1;
+	}
+
+	char buffer[800];
+	sprintf(buffer, "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=%s", jwt);
+	err = esp_http_client_set_post_field(client, buffer, strlen(buffer));
+	if (err != ESP_OK) {
+		ESP_LOGE(LOG_TAG_HTTP, "Failed to set HTTP POST field: %s", esp_err_to_name(err));
+		esp_http_client_cleanup(client);
+		return 1;
+	}
+
+	err = esp_http_client_perform(client);
+	if (err == ESP_OK) {
+		ESP_LOGD(LOG_TAG_HTTP,
+				 "HTTPS GET Status = %d, content_length = %d",
+				 esp_http_client_get_status_code(client),
+				 esp_http_client_get_content_length(client));
+		esp_http_client_cleanup(client);
+		return 0;
+	} else {
+		ESP_LOGE(LOG_TAG_HTTP, "HTTPS GET request failed: %s", esp_err_to_name(err));
+		esp_http_client_cleanup(client);
+		return 1;
+	}
 }
 
 void disconnect_wifi()
