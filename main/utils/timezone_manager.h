@@ -483,5 +483,6 @@ void zones_hash_init(void);
 uint8_t convert_time_to_timezone(const char* zone_name, const char* time_str, char* output_time_string);
 uint8_t convert_time_to_local(const char* zone_name, time_t time, struct tm* output_local_time);
 uint8_t tm_to_hour_min(const struct tm* timeinfo, char* output_time_string);
+void time_difference(const char* time_str1, const char* time_str2, char* output_time_string);
 
 #endif  // TIMEZONE_MANAGER_H_

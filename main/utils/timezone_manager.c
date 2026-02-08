@@ -1,6 +1,6 @@
-
 #include "timezone_manager.h"
 #include <search.h>
+#include <stdio.h>
 
 void zones_hash_init(void)
 {
@@ -80,4 +80,32 @@ uint8_t tm_to_hour_min(const struct tm* timeinfo, char* output_time_string)
 		return 1; // Failed to format time
 	}
 	return 0;
+}
+
+void time_difference(const char* time_str1, const char* time_str2, char* output_time_string)
+{
+	struct tm tm_time1 = { 0 };
+	struct tm tm_time2 = { 0 };
+
+	strptime(time_str1, "%Y-%m-%dT%H:%M:%S", &tm_time1);
+	strptime(time_str2, "%Y-%m-%dT%H:%M:%S", &tm_time2);
+
+	time_t raw_time1 = mktime(&tm_time1);
+	time_t raw_time2 = mktime(&tm_time2);
+
+	double diff_seconds = difftime(raw_time2, raw_time1);
+	int hours = (int)(diff_seconds / 3600);
+	int minutes = (int)((diff_seconds - (hours * 3600)) / 60);
+
+	if (hours == 0) {
+		sprintf(output_time_string, "%d min", minutes);
+	} else if (minutes == 0) {
+		if (hours == 1) {
+			sprintf(output_time_string, "%d hour", hours);
+		} else {
+			sprintf(output_time_string, "%d hours", hours);
+		}
+	} else {
+		sprintf(output_time_string, "%d h %d min", hours, minutes);
+	}
 }
