@@ -17,6 +17,7 @@ typedef struct location {
 #define LOCATION_DONE_BIT (1 << 0)
 #define CURRENT_WEATHER_DONE_BIT (1 << 1)
 #define FORECAST_WEATHER_DONE_BIT (1 << 2)
+#define EVENTS_DONE_BIT (1 << 3)
 
 #define CALENDAR_TARGET CONFIG_CALENDAR
 

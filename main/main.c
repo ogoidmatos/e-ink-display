@@ -131,4 +131,11 @@ void app_main(void)
 		ESP_LOGE(LOG_TAG_MAIN, "Error starting weather task.");
 		return;
 	}
+
+	// start calendar task
+	err = start_calendar_task();
+	if (err != 0) {
+		ESP_LOGE(LOG_TAG_MAIN, "Error starting calendar task.");
+		return;
+	}
 }

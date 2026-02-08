@@ -5,15 +5,15 @@
 #include <string.h>
 
 // ESP includes
-#include "cJSON.h"
 #include "esp_log.h"
+#include "esp_sleep.h"
 
 // FreeRTOS includes
-#include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 // Own includes
+#include "json-parser.h"
 #include "network_manager.h"
 #include "task_manager.h"
 #include "timezone_manager.h"
@@ -99,101 +99,6 @@ static void location_task(void* args)
 	cJSON_Delete(json);
 
 	vTaskDelete(NULL);
-}
-
-void parse_weather_json(cJSON* json, current_weather_t* weather)
-{
-	// Parse JSON data for weather
-	weather->is_day_time = cJSON_GetObjectItem(json, "isDayTime")->valueint;
-
-	cJSON* weatherCondition = cJSON_GetObjectItem(json, "weatherCondition");
-	const char* desc =
-	  cJSON_GetObjectItem(cJSON_GetObjectItem(weatherCondition, "description"), "text")
-		->valuestring;
-	strncpy(weather->description, desc, sizeof(weather->description) - 1);
-
-	const char* code = cJSON_GetObjectItem(weatherCondition, "type")->valuestring;
-	strncpy(weather->weather_code, code, sizeof(weather->weather_code) - 1);
-
-	weather->temperature_c =
-	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(json, "temperature"), "degrees")->valuedouble;
-	weather->feels_like_temperature_c =
-	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(json, "feelsLikeTemperature"), "degrees")
-		->valuedouble;
-	weather->humidity = cJSON_GetObjectItem(json, "relativeHumidity")->valueint;
-	weather->uv_index = cJSON_GetObjectItem(json, "uvIndex")->valueint;
-
-	cJSON* current_conditions = cJSON_GetObjectItem(json, "currentConditionsHistory");
-	weather->max_temperature_c =
-	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(current_conditions, "maxTemperature"),
-								 "degrees")
-		->valuedouble;
-	weather->min_temperature_c =
-	  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(current_conditions, "minTemperature"),
-								 "degrees")
-		->valuedouble;
-
-	weather->wind_speed_kph =
-	  cJSON_GetObjectItem(cJSON_GetObjectItem(cJSON_GetObjectItem(json, "wind"), "speed"), "value")
-		->valueint;
-
-	weather->rain_chance =
-	  cJSON_GetObjectItem(
-		cJSON_GetObjectItem(cJSON_GetObjectItem(json, "precipitation"), "probability"), "percent")
-		->valueint;
-}
-
-void parse_forecast_json(cJSON* json, forecast_weather_t* forecast_array, size_t array_size)
-{
-	// Parse JSON data for forecast
-	// today is day 0, tomorrow is day 1, day after tomorrow is day 2
-	cJSON* forecastDays = cJSON_GetObjectItem(json, "forecastDays");
-	for (size_t i = 0; i < array_size; i++) {
-		cJSON* day = cJSON_GetArrayItem(forecastDays, i);
-		if (i == 0) {
-			char* time_buffer =
-			  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "sunEvents"), "sunriseTime")
-				->valuestring;
-			char* timezone =
-			  cJSON_GetObjectItem(cJSON_GetObjectItem(json, "timeZone"), "id")->valuestring;
-			convert_time_to_timezone(timezone, time_buffer, forecast_array[i].sunrise_time);
-			time_buffer =
-			  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "sunEvents"), "sunsetTime")->valuestring;
-			convert_time_to_timezone(timezone, time_buffer, forecast_array[i].sunset_time);
-			continue; // skip today, we only want the sunrise/sunset times for today
-		}
-
-		forecast_array[i].date.year =
-		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "year")->valueint;
-		forecast_array[i].date.month =
-		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "month")->valueint;
-		forecast_array[i].date.day =
-		  cJSON_GetObjectItem(cJSON_GetObjectItem(day, "displayDate"), "day")->valueint;
-
-		forecast_array[i].max_temperature_c =
-		  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(day, "maxTemperature"), "degrees")
-			->valuedouble;
-		forecast_array[i].min_temperature_c =
-		  (float)cJSON_GetObjectItem(cJSON_GetObjectItem(day, "minTemperature"), "degrees")
-			->valuedouble;
-
-		cJSON* daytimeForecast = cJSON_GetObjectItem(day, "daytimeForecast");
-		cJSON* weatherCondition = cJSON_GetObjectItem(daytimeForecast, "weatherCondition");
-		const char* desc =
-		  cJSON_GetObjectItem(cJSON_GetObjectItem(weatherCondition, "description"), "text")
-			->valuestring;
-		strncpy(forecast_array[i].description, desc, sizeof(forecast_array[i].description) - 1);
-
-		const char* code = cJSON_GetObjectItem(weatherCondition, "type")->valuestring;
-		strncpy(forecast_array[i].weather_code, code, sizeof(forecast_array[i].weather_code) - 1);
-
-		forecast_array[i].rain_chance =
-		  cJSON_GetObjectItem(
-			cJSON_GetObjectItem(cJSON_GetObjectItem(daytimeForecast, "precipitation"),
-								"probability"),
-			"percent")
-			->valueint;
-	}
 }
 
 static void current_weather_task(void* args)
@@ -285,7 +190,8 @@ static void refresh_task(void* args)
 		return;
 	}
 	xEventGroupWaitBits(ui_cycle_group,
-						LOCATION_DONE_BIT | CURRENT_WEATHER_DONE_BIT | FORECAST_WEATHER_DONE_BIT,
+						LOCATION_DONE_BIT | CURRENT_WEATHER_DONE_BIT | FORECAST_WEATHER_DONE_BIT |
+						  EVENTS_DONE_BIT,
 						pdTRUE, // clear bits
 						pdTRUE, // wait for all bits
 						portMAX_DELAY);
@@ -367,6 +273,17 @@ static void forecast_weather_task(void* args)
 
 static void calendar_task(void* args)
 {
+	// wait on location task to set the current timezone and localtime
+	if (ui_cycle_group == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "UI cycle event group is NULL.");
+		return;
+	}
+	xEventGroupWaitBits(ui_cycle_group,
+						LOCATION_DONE_BIT,
+						pdFALSE, // do not clear bits
+						pdTRUE,	 // wait for all bits
+						portMAX_DELAY);
+
 	char* http_output_buffer = calloc(MAX_HTTP_OUTPUT_BUFFER, sizeof(char));
 	if (http_output_buffer == NULL) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error allocating memory for HTTP output buffer.");
@@ -374,13 +291,19 @@ static void calendar_task(void* args)
 		return;
 	}
 
-	char url[360];
+	char url[256];
+	char date_buffer[12];
+	strftime(date_buffer, 12, "%Y-%m-%d", &current_time);
 	sprintf(url,
-			"https://googleapis.com/calendar/v3/calendars/%s/"
-			"events?timeMin=2026-01-22T00:00:00Z&timeMax=2026-01-22T23:59:00Z&fields=items(summary,"
-			"start,end)&key=%s",
+			"https://content.googleapis.com/calendar/v3/calendars/%s/events?"
+			"singleEvents=true&timeMin=%sT00:00:00Z&timeMax=%sT23:59:00Z&orderBy=startTime&"
+			"fields=items(summary,start,end)&key=%s",
 			CALENDAR_TARGET,
+			date_buffer,
+			date_buffer,
 			GOOGLE_API_KEY);
+
+	ESP_LOGI(LOG_TAG_TASK_MANAGER, "%s", url);
 
 	xSemaphoreTake(http_mutex, portMAX_DELAY);
 	uint8_t err = https_get_request(url, http_output_buffer);
@@ -392,6 +315,58 @@ static void calendar_task(void* args)
 	}
 	// write buffer into JSON object and free buffer
 	cJSON* json = cJSON_Parse(http_output_buffer);
+	if (json == NULL) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error parsing JSON response.");
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Output buffer: %s", http_output_buffer);
+		free(http_output_buffer);
+		return;
+	}
+
+	calendar_event_t* events = NULL;
+	int num_events = parse_events_json(json, events);
+	cJSON_Delete(json);
+
+	if (num_events < 0) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error parsing calendar events JSON.");
+		free(http_output_buffer);
+		return;
+	} else if (num_events > 0) {
+		// write events to UI
+		err = write_calendar_events_ui(events, num_events);
+		if (err != 0) {
+			ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing calendar events to UI.");
+		}
+	} else {
+		// no events, get random fact of the day and write to UI
+		strcpy(url, "https://uselessfacts.jsph.pl/random.json");
+		xSemaphoreTake(http_mutex, portMAX_DELAY);
+		uint8_t err = https_get_request(url, http_output_buffer);
+		xSemaphoreGive(http_mutex);
+		if (err != 0) {
+			ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error performing HTTPS GET request.");
+			free(http_output_buffer);
+			return;
+		}
+		cJSON* fact_json = cJSON_Parse(http_output_buffer);
+		if (fact_json == NULL) {
+			ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error parsing JSON response.");
+			ESP_LOGE(LOG_TAG_TASK_MANAGER, "Output buffer: %s", http_output_buffer);
+			free(http_output_buffer);
+			return;
+		}
+		const char* fact = cJSON_GetObjectItem(fact_json, "text")->valuestring;
+		err = write_fact_ui(fact);
+		if (err != 0) {
+			ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing fact to UI.");
+		}
+		cJSON_Delete(fact_json);
+	}
+
+	// signal calendar events tab done
+	xEventGroupSetBits(ui_cycle_group, EVENTS_DONE_BIT);
+
+	free(http_output_buffer);
+	free(events);
 
 	vTaskDelete(NULL);
 }
@@ -414,7 +389,7 @@ uint8_t start_location_task()
 			 longitude);
 	return 0;
 #else
-	uint8_t err = xTaskCreate(location_task, "location_task", 4096, NULL, 5, NULL);
+	uint8_t err = xTaskCreate(location_task, "location_task", 4096, NULL, 6, NULL);
 	if (err != pdPASS) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating location task.");
 		return 1;
@@ -459,5 +434,16 @@ uint8_t start_refresh_task()
 		return 1;
 	}
 	ESP_LOGD(LOG_TAG_TASK_MANAGER, "Refresh task created.");
+	return 0;
+}
+
+uint8_t start_calendar_task()
+{
+	uint8_t err = xTaskCreate(calendar_task, "calendar_task", 4096, NULL, 5, NULL);
+	if (err != pdPASS) {
+		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating calendar task.");
+		return 1;
+	}
+	ESP_LOGD(LOG_TAG_TASK_MANAGER, "Calendar task created.");
 	return 0;
 }
