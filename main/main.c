@@ -39,7 +39,7 @@ void app_main(void)
 	ESP_ERROR_CHECK(esp_err);
 
 	// config sleep timer wake up
-	esp_err = esp_sleep_enable_timer_wakeup((uint64_t)30 * SECONDS_TO_MICROSECONDS);
+	esp_err = esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_TIME);
 	if (esp_err != ESP_OK) {
 		ESP_LOGE(LOG_TAG_MAIN, "Error enabling timer wakeup for deep sleep.");
 		return;
