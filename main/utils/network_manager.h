@@ -16,6 +16,7 @@ _Static_assert(strcmp(WIFI_PASSWORD, "your-password") != 0, "Please configure Wi
 
 // API configuration
 #define GOOGLE_API_KEY CONFIG_GOOGLE_API_KEY
+#define CLIENT_EMAIL CONFIG_CLIENT_EMAIL
 
 #if !defined (CONFIG_USE_DYNAMIC_LOCATION) || (CONFIG_USE_DYNAMIC_LOCATION == 0)
 

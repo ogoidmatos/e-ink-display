@@ -7,6 +7,7 @@
 // ESP includes
 #include "esp_log.h"
 #include "esp_sleep.h"
+#include "nvs.h"
 
 // FreeRTOS includes
 #include "freertos/FreeRTOS.h"
@@ -18,6 +19,7 @@
 #include "task_manager.h"
 #include "timezone_manager.h"
 #include "ui/ui.h"
+#include "utils/jwt_manager.h"
 
 static EventGroupHandle_t ui_cycle_group;
 static location_t cached_location;
@@ -291,6 +293,23 @@ static void calendar_task(void* args)
 		return;
 	}
 
+	// get private key from nvs, stored in previous build
+	nvs_handle_t nvs_handle;
+	ESP_ERROR_CHECK(nvs_open("storage", NVS_READONLY, &nvs_handle));
+	size_t required_size;
+	nvs_get_str(nvs_handle, "priv_key", NULL, &required_size);
+	char* private_key = malloc(required_size);
+	nvs_get_str(nvs_handle, "priv_key", private_key, &required_size);
+
+	// create JWT with private key
+	char* jwt = createGCPJWT(CLIENT_EMAIL, (uint8_t*)private_key, strlen(private_key) + 1);
+
+	// erase private key from memory
+	memset(private_key, 0, required_size);
+	free(private_key);
+
+	ESP_LOGE(LOG_TAG_TASK_MANAGER, "JWT: %s", jwt);
+
 	char url[256];
 	char date_buffer[12];
 	strftime(date_buffer, 12, "%Y-%m-%d", &current_time);
@@ -439,7 +458,7 @@ uint8_t start_refresh_task()
 
 uint8_t start_calendar_task()
 {
-	uint8_t err = xTaskCreate(calendar_task, "calendar_task", 4096, NULL, 5, NULL);
+	uint8_t err = xTaskCreate(calendar_task, "calendar_task", 8192, NULL, 5, NULL);
 	if (err != pdPASS) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error creating calendar task.");
 		return 1;

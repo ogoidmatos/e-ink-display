@@ -12,13 +12,21 @@ menu "WiFi Configuration"
             The password for the WiFi network.
 endmenu
 
-menu "API Configuration"
+menu "Google API Keys Configuration"
     config GOOGLE_API_KEY
         string "Google API Key"
         default "your-api-key"
         help
             The API key for accessing the Google Maps Weather API.
-    
+
+    config CLIENT_EMAIL
+        string "Service Account Client Email"
+        default "your-service-account-email"
+        help
+            The client email of the service account used for calendar access.
+endmenu
+
+menu "E-Paper Display App Configuration"
     config USE_DYNAMIC_LOCATION
         bool "Use Dynamic Location"
         default y
