@@ -50,4 +50,10 @@ menu "E-Paper Display App Configuration"
         default "primary"
         help
             The calendar ID for which to fetch events. Use "primary" for the primary calendar of the authenticated user. Primary calendar might not work with service accounts.
+
+    config UPDATE_INTERVAL
+        int "Update Interval (hours)"
+        default 6
+        help
+            The interval in hours at which the app will fetch new weather and calendar data.
 endmenu
