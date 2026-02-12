@@ -217,7 +217,7 @@ static inline uint8_t day_of_the_week(uint8_t d, uint8_t m, uint16_t y)
 	return (y + y / 4 - y / 100 + y / 400 + "-bed=pen+mad."[m] + d) % 7;
 }
 
-uint8_t write_date_ui(uint16_t year, uint8_t month, uint8_t day)
+uint8_t write_date_ui(uint16_t year, uint8_t month, uint8_t day, uint8_t day_of_week)
 {
 	// write date
 	int cursor_x = 52;
@@ -229,12 +229,7 @@ uint8_t write_date_ui(uint16_t year, uint8_t month, uint8_t day)
 	const char day_str[7][10] = { "Sunday",	  "Monday", "Tuesday", "Wednesday",
 								  "Thursday", "Friday", "Saturday" };
 
-	sprintf(date,
-			"%s, %02d %s %04d",
-			day_str[day_of_the_week(day, month, year)],
-			day,
-			month_str[month],
-			year);
+	sprintf(date, "%s, %02d %s %04d", day_str[day_of_week], day, month_str[month], year);
 
 	ESP_LOGD(LOG_TAG_UI, "%s", date);
 

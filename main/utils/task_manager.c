@@ -79,7 +79,8 @@ static void location_task(void* args)
 	convert_time_to_local(current_timezone, time(NULL), &current_time);
 
 	// write date to UI
-	err = write_date_ui(current_time.tm_year + 1900, current_time.tm_mon, current_time.tm_mday);
+	err = write_date_ui(
+	  current_time.tm_year + 1900, current_time.tm_mon, current_time.tm_mday, current_time.tm_wday);
 	if (err != 0) {
 		ESP_LOGE(LOG_TAG_TASK_MANAGER, "Error writing date to UI.");
 	}

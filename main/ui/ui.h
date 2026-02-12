@@ -70,7 +70,7 @@ uint8_t refresh_screen_ui();
 
 uint8_t write_current_weather_ui(const current_weather_t* weather);
 
-uint8_t write_date_ui(uint16_t year, uint8_t month, uint8_t day);
+uint8_t write_date_ui(uint16_t year, uint8_t month, uint8_t day, uint8_t day_of_week);
 
 uint8_t write_forecast_ui(const forecast_weather_t* forecast_array);
 
