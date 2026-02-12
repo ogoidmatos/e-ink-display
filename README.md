@@ -73,7 +73,9 @@ As such, obviously, contributions and sugestions are extremely welcome, as I hop
    - Google Calendar needs a service account to log through OAuth2.0 to provide the needed data. You can follow [this guide](https://developers.google.com/identity/protocols/oauth2/service-account#creatinganaccount) to create a service account. You will need to create a key to register on your ESP32. Configure your client email on the menuconfig.
 
 ### 3. Configure Google OAuth Service Account Private Key
-    - Section in Progress
+  - After creating your key in the step above, download the JSON file that has your account details and your private key.
+  - Write your private key into `main/key.pem`, without `"`, as the example file shows, and without replacing the `\n` by line breaks.
+  - The private key will be injected to the NVS storage during the build and flash.
 
 ### 4. Build and flash
    - Run:
