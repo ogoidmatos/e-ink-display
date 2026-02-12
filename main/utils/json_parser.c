@@ -147,3 +147,43 @@ int parse_events_json(cJSON* json, calendar_event_t* events)
 
 	return length;
 }
+
+size_t unescape_c_sequences(char* buffer, size_t len)
+{
+	size_t read_idx = 0;
+	size_t write_idx = 0;
+
+	while (read_idx < len && buffer[read_idx] != '\0') {
+		if (buffer[read_idx] == '\\' && (read_idx + 1) < len) {
+			char next = buffer[read_idx + 1];
+			switch (next) {
+				case 'n':
+					buffer[write_idx++] = '\n';
+					read_idx += 2;
+					continue;
+				case 'r':
+					buffer[write_idx++] = '\r';
+					read_idx += 2;
+					continue;
+				case 't':
+					buffer[write_idx++] = '\t';
+					read_idx += 2;
+					continue;
+				case '\\':
+					buffer[write_idx++] = '\\';
+					read_idx += 2;
+					continue;
+				case '"':
+					buffer[write_idx++] = '"';
+					read_idx += 2;
+					continue;
+				default:
+					break;
+			}
+		}
+		buffer[write_idx++] = buffer[read_idx++];
+	}
+
+	buffer[write_idx] = '\0';
+	return write_idx;
+}

@@ -296,17 +296,24 @@ static void calendar_task(void* args)
 
 	// get private key from nvs, stored in previous build
 	nvs_handle_t nvs_handle;
-	ESP_ERROR_CHECK(nvs_open("storage", NVS_READONLY, &nvs_handle));
+	ESP_ERROR_CHECK(nvs_open("key-storage", NVS_READONLY, &nvs_handle));
 	size_t required_size;
-	nvs_get_str(nvs_handle, "priv_key", NULL, &required_size);
-	char* private_key = malloc(required_size);
-	nvs_get_str(nvs_handle, "priv_key", private_key, &required_size);
+	nvs_get_blob(nvs_handle, "priv_key", NULL, &required_size);
+	char* private_key = malloc(required_size + 1);
+	nvs_get_blob(nvs_handle, "priv_key", private_key, &required_size);
+
+	nvs_close(nvs_handle);
+
+	size_t decoded_len = unescape_c_sequences(private_key, required_size);
+
+	// key is read as a binary blob so we need to add a null terminator
+	private_key[decoded_len] = '\0';
 
 	// create JWT with private key
-	char* jwt = createGCPJWT(CLIENT_EMAIL, (uint8_t*)private_key, strlen(private_key) + 1);
+	char* jwt = createGCPJWT(CLIENT_EMAIL, (uint8_t*)private_key, decoded_len + 1);
 
 	// erase private key from memory
-	memset(private_key, 0, required_size);
+	memset(private_key, 0, required_size + 1);
 	free(private_key);
 
 	ESP_LOGD(LOG_TAG_TASK_MANAGER, "JWT: %s", jwt);
