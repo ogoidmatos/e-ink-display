@@ -29,6 +29,8 @@ As such, obviously, contributions and sugestions are extremely welcome, as I hop
 - Deep sleep for power saving
 - Battery power measurement
 
+<img alt="Displaying events while connected to battery" src="https://github.com/user-attachments/assets/7bb74d94-44f3-4540-a0be-d1bce7e2a143" style="width:49%; height:auto"/>
+<img alt="Displaying random fact while connected to battery" src="https://github.com/user-attachments/assets/30016b62-6628-470a-b020-c578963585b3" style="width:49%; height:auto"/>
 
 ## Hardware Requirements
 - [LilyGo EPD47 Board](https://github.com/Xinyuan-LilyGO/LilyGo-EPD47) ESP32-S3 with e-ink display
