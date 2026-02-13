@@ -72,6 +72,8 @@ As such, obviously, contributions and sugestions are extremely welcome, as I hop
    - Create your Google Maps API [here](https://mapsplatform.google.com/lp/maps-apis/). You only need the Weather API enabled for your key.
    - Google Calendar needs a service account to log through OAuth2.0 to provide the needed data. You can follow [this guide](https://developers.google.com/identity/protocols/oauth2/service-account#creatinganaccount) to create a service account. You will need to create a key to register on your ESP32. Configure your client email on the menuconfig.
 
+<img width="374" height="298" alt="Menu Config Highlighting needed configurations" src="https://github.com/user-attachments/assets/abae7ecd-fca6-4630-9b70-616e7e9e57bf" />
+
 ### 3. Configure Google OAuth Service Account Private Key
   - After creating your key in the step above, download the JSON file that has your account details and your private key.
   - Write your private key into `main/key.pem`, without `"`, as the example file shows, and without replacing the `\n` by line breaks.
